@@ -11,6 +11,7 @@ import asyncio
 import os
 import re
 import time
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 from urllib.parse import unquote, urlparse
 from xml.etree import ElementTree
@@ -37,7 +38,7 @@ WEB_SEARCH_PROMPT_INSTRUCTIONS = (
     "For latest, current, stable-release, or other time-sensitive claims, prefer official "
     "release, download, status, or announcement pages over forums and discussion threads. "
     "Open an authoritative result, compare its date/status, and never treat an old discussion "
-    "as evidence of the current state. "
+    "as evidence of the current state. Never fetch or cite entries listed under rejected_results. "
     "Do not call web_search for simple stable facts or purely local tasks."
 )
 
@@ -118,6 +119,14 @@ def _source_kind(url: str, query: str) -> tuple[str, int]:
         return "discussion", -100
     if not _is_time_sensitive_release_query(query):
         return "web", 0
+    if (
+        path in {"/versions", "/version-status", "/status", "/support", "/lifecycle"}
+        or "/versions/" in f"{path}/"
+        or "/version-status/" in f"{path}/"
+        or "/release-status/" in f"{path}/"
+        or "/lifecycle/" in f"{path}/"
+    ):
+        return "official-status", 200
     if "/downloads/release/" in f"{path}/" or "/releases/" in f"{path}/":
         return "official-release", 100
     if path in {"/downloads", "/download", "/releases", "/release"}:
@@ -129,14 +138,72 @@ def _source_kind(url: str, query: str) -> tuple[str, int]:
     return "web", 0
 
 
+def _canonical_result_url(url: str) -> str:
+    """Normalize cosmetic URL variants so one source is not returned multiple times."""
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower()
+    if hostname.startswith("www."):
+        hostname = hostname[4:]
+    path = re.sub(r"/+", "/", parsed.path or "/").rstrip("/") or "/"
+    return f"{hostname}{path}"
+
+
+def _stale_release_reason(result: dict[str, Any], query: str) -> str | None:
+    """Detect explicit evidence that a release page is not current."""
+    if not _is_time_sensitive_release_query(query):
+        return None
+    evidence = " ".join(
+        str(result.get(field, ""))
+        for field in ("title", "snippet", "content", "summary")
+    ).lower()
+    stale_markers = {
+        "has been superseded": "superseded release",
+        "legacy release": "legacy release",
+        "reached end-of-life": "end-of-life release",
+        "reached end of life": "end-of-life release",
+        "is no longer supported": "unsupported release",
+        "no longer receives security updates": "unsupported release",
+    }
+    for marker, reason in stale_markers.items():
+        if marker in evidence:
+            return reason
+    published_date = str(result.get("published_date") or "")
+    year_match = re.search(r"\b(20\d{2})\b", published_date)
+    release_date_match = re.search(
+        r"\brelease date:\s*[^\n]{0,40}?\b(20\d{2})\b", evidence, re.I
+    )
+    year_text = (year_match or release_date_match)
+    if year_text and int(year_text.group(1)) < datetime.now(UTC).year - 1:
+        return f"release date is from {year_text.group(1)}"
+    return None
+
+
+def _strip_redundant_site_operators(query: str, include: list[str]) -> str:
+    """Avoid sending both Tavily include_domains and equivalent site: operators."""
+    cleaned = query
+    for domain in include:
+        cleaned = re.sub(rf"\bsite:{re.escape(domain)}\b", " ", cleaned, flags=re.I)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 def _rank_results(
     results: list[dict[str, Any]], query: str
 ) -> list[dict[str, Any]]:
     """Add ranking evidence and prefer authoritative sources for current-release queries."""
     enriched: list[tuple[int, float, int, dict[str, Any]]] = []
+    seen_urls: set[str] = set()
     for original_index, result in enumerate(results):
         item = dict(result)
+        canonical_url = _canonical_result_url(str(item.get("url", "")))
+        if canonical_url in seen_urls:
+            continue
+        seen_urls.add(canonical_url)
         source_kind, authority_score = _source_kind(str(item.get("url", "")), query)
+        stale_reason = _stale_release_reason(item, query)
+        if stale_reason:
+            source_kind = "superseded-release"
+            authority_score = -200
+            item["rejection_reason"] = stale_reason
         item["source_kind"] = source_kind
         item["authority_score"] = authority_score
         try:
@@ -249,15 +316,19 @@ async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]
     count = _clamp_count(params.get("count", params.get("max_results", DEFAULT_RESULT_COUNT)))
     include = _normalize_domains(params.get("include_domains", params.get("include")))
     exclude = _normalize_domains(params.get("exclude_domains", params.get("exclude")))
-    search_depth = str(params.get("search_depth") or "basic")
-    if search_depth not in {"basic", "advanced"}:
+    requested_search_depth = str(params.get("search_depth") or "basic")
+    if requested_search_depth not in {"basic", "advanced"}:
         raise ValueError("search_depth must be 'basic' or 'advanced'")
+    time_sensitive = _is_time_sensitive_release_query(query)
+    search_depth = "advanced" if time_sensitive else requested_search_depth
+    time_range = str(params.get("time_range") or ("year" if time_sensitive else ""))
     topic = str(params.get("topic") or "general")
     if topic not in {"general", "news", "finance"}:
         raise ValueError("topic must be 'general', 'news', or 'finance'")
+    provider_query = _strip_redundant_site_operators(query, include)
     body: dict[str, Any] = {
         "api_key": api_key,
-        "query": query,
+        "query": provider_query,
         "max_results": count,
         "search_depth": search_depth,
         "topic": topic,
@@ -265,7 +336,13 @@ async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]
         "exclude_domains": exclude,
         "include_answer": False,
         "include_raw_content": False,
+        "include_published_date": True,
+        "language": "en",
+        "filter_by_language": True,
     }
+    if time_range:
+        body["time_range"] = time_range
+        body["filter_by_published_date"] = True
     started = time.monotonic()
     last_error = ""
     retry_count = 0
@@ -298,15 +375,33 @@ async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]
                             "snippet": str(item.get("content") or ""),
                             "content": str(item.get("content") or ""),
                             "score": item.get("score"),
+                            "published_date": item.get("published_date"),
                             "rank": rank,
                         }
                     )
-                results = _rank_results(_filter_results(results, include, exclude), query)
+                ranked_results = _rank_results(
+                    _filter_results(results, include, exclude), query
+                )
+                rejected_results = [
+                    item
+                    for item in ranked_results
+                    if item.get("source_kind") == "superseded-release"
+                ]
+                results = [
+                    item
+                    for item in ranked_results
+                    if item.get("source_kind") != "superseded-release"
+                ]
+                for rank, item in enumerate(results, start=1):
+                    item["rank"] = rank
                 result: dict[str, Any] = {
                     "ok": True,
                     "provider": "tavily",
                     "query": query,
+                    "provider_query": provider_query,
                     "search_depth": search_depth,
+                    "requested_search_depth": requested_search_depth,
+                    "time_range": time_range or None,
                     "topic": topic,
                     "include_domains": include,
                     "exclude_domains": exclude,
@@ -319,17 +414,28 @@ async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]
                         "ranking_policy": "authority-aware-v1",
                     },
                 }
+                if rejected_results:
+                    result["rejected_results"] = [
+                        {
+                            "title": item.get("title"),
+                            "url": item.get("url"),
+                            "reason": item.get("rejection_reason"),
+                        }
+                        for item in rejected_results
+                    ]
                 if _is_time_sensitive_release_query(query):
                     result["research_guidance"] = (
                         "Verify the current claim from a result marked official-release, "
-                        "official-release-index, or official-announcement. Open that page and "
-                        "check its date and status. Do not use a discussion thread as evidence "
-                        "of the latest version."
+                        "official-status, official-release-index, or official-announcement. "
+                        "Prefer official-status because it compares supported versions. Open it "
+                        "and check its date and status. Do not use a discussion thread as evidence "
+                        "of the latest version, and never fetch or cite rejected_results."
                     )
                 if not results:
                     result["warning"] = (
-                        "Tavily returned zero usable results. This is not evidence that the "
-                        "information does not exist."
+                        "Tavily returned zero current, usable results after rejecting duplicate, "
+                        "superseded, legacy, end-of-life, or unsupported release pages. This is "
+                        "not evidence that the information does not exist."
                     )
                 return result
         except (httpx.TimeoutException, httpx.TransportError) as exc:

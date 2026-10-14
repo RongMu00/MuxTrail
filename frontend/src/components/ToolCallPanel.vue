@@ -34,6 +34,17 @@
               <dd>{{ row.value }}</dd>
             </template>
           </dl>
+          <div v-if="searchSources(tool.result).length" class="source-list">
+            <strong>Sources</strong>
+            <ol>
+              <li v-for="source in searchSources(tool.result)" :key="source.url">
+                <a :href="source.url" target="_blank" rel="noreferrer">
+                  {{ source.title || source.url }}
+                </a>
+                <span v-if="source.kind">{{ source.kind }}</span>
+              </li>
+            </ol>
+          </div>
           <pre>{{ formatResult(tool.result) }}</pre>
         </div>
         <details>
@@ -95,6 +106,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function extractUrl(result: unknown) {
   const parsed = parseResult(result)
   if (isRecord(parsed) && typeof parsed.url === 'string') return parsed.url
+  const sources = searchSources(parsed)
+  if (sources.length) return sources[0].url
   if (typeof parsed !== 'string') return ''
   return parsed.match(/https?:\/\/\S+/)?.[0] || ''
 }
@@ -104,6 +117,11 @@ function summaryRows(result: unknown) {
   if (!isRecord(parsed)) return []
   const labels: Record<string, string> = {
     ok: 'Status',
+    provider: 'Provider',
+    query: 'Query',
+    search_depth: 'Search depth',
+    time_range: 'Time range',
+    result_count: 'Results',
     title: 'Title',
     document_id: 'Document ID',
     url: 'URL',
@@ -116,6 +134,19 @@ function summaryRows(result: unknown) {
     .map(([key, label]) => ({
       label,
       value: key === 'ok' ? (parsed[key] ? 'Success' : 'Failed') : String(parsed[key]),
+    }))
+}
+
+function searchSources(result: unknown) {
+  const parsed = parseResult(result)
+  if (!isRecord(parsed) || !Array.isArray(parsed.results)) return []
+  return parsed.results
+    .filter(isRecord)
+    .filter((item) => typeof item.url === 'string')
+    .map((item) => ({
+      title: typeof item.title === 'string' ? item.title : '',
+      url: String(item.url),
+      kind: typeof item.source_kind === 'string' ? item.source_kind : '',
     }))
 }
 </script>
@@ -227,6 +258,34 @@ function summaryRows(result: unknown) {
   font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
+}
+.source-list {
+  margin: 0 0 9px;
+  padding: 9px;
+  background: #fff;
+  border: 1px solid rgba(209, 213, 219, 0.7);
+}
+.source-list > strong {
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+}
+.source-list ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.source-list li {
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.source-list a {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+.source-list span {
+  display: block;
+  color: var(--muted);
+  font: 600 9px/1.4 var(--mono);
 }
 details {
   border-top: 1px solid rgba(209, 213, 219, 0.6);

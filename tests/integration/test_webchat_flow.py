@@ -132,4 +132,7 @@ async def test_structured_tool_failure_emits_failed_runtime_event(
     assert tool_event["title"] == "Tool failed: web_fetch"
     assert tool_event["data"]["success"] is False
     assert "HTTP 404" in str(tool_event["data"]["result"])
-    assert "HTTP 404" in "".join(result.texts)
+    response = "".join(result.texts)
+    assert "server returned HTTP 404" in response
+    assert "does not prove that the resource permanently does not exist" in response
+    assert "page does not exist on the server" not in response

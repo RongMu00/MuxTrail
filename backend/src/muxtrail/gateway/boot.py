@@ -134,6 +134,10 @@ class AgentRunResult:
         # 记录最后一次 web_search 是否失败。Gateway 会用确定性提示替换模型基于“零结果”
         # 产生的猜测，例如错误地断言某个版本尚未发布。
         self.last_search_error: str | None = None
+        # 记录本轮工具结果。若一次直接网页读取只调用了 web_fetch 且全部失败，Gateway 会
+        # 使用确定性的失败说明，避免模型把 HTTP 状态码扩写成未经证实的事实。
+        self.tool_names: list[str] = []
+        self.web_fetch_failures: list[dict[str, Any]] = []
 
 
 def _extract_tool_reply_text(tool_result: Any) -> str:
@@ -175,6 +179,39 @@ def _search_failure_reply(error: str) -> str:
         f"Search did not return usable, verifiable sources: {error}. "
         "This only means the current search attempt found no usable evidence; it does not "
         "show that an event did not happen or that the information does not exist."
+    )
+
+
+def _extract_web_fetch_failure(tool_result: Any) -> dict[str, Any] | None:
+    """Return structured fetch failure details without treating the error body as evidence."""
+    if not isinstance(tool_result, str) or not tool_result:
+        return {"error": "webpage tool returned an unreadable result"}
+    try:
+        payload = json.loads(tool_result)
+    except json.JSONDecodeError:
+        return {"error": "webpage tool returned an unreadable result"}
+    if not isinstance(payload, dict):
+        return {"error": "webpage tool returned an unreadable result"}
+    error = payload.get("error")
+    if payload.get("ok") is not False and not (isinstance(error, str) and error.strip()):
+        return None
+    return payload
+
+
+def _web_fetch_failure_reply(failure: dict[str, Any]) -> str:
+    """Create a factual response that does not over-interpret a failed HTTP request."""
+    status = failure.get("status")
+    if isinstance(status, int):
+        return (
+            f"The webpage fetch failed because the server returned HTTP {status} for this request. "
+            "No page content was available. The status describes this response only; it does not "
+            "prove that the resource permanently does not exist."
+        )
+    error = failure.get("error")
+    detail = error.strip() if isinstance(error, str) and error.strip() else "unknown fetch error"
+    return (
+        f"The webpage fetch failed: {detail}. No page content was available, so I cannot describe "
+        "or infer its contents."
     )
 
 
@@ -623,6 +660,7 @@ class GatewayRuntime:
                         }
                     )
                     current_assistant_index = None
+                    result.tool_names.append(str(event.tool_name or ""))
                     await self._emit_runtime_event(
                         "runtime.tool.started",
                         layer="tools",
@@ -647,6 +685,10 @@ class GatewayRuntime:
                     if event.tool_name == "web_search":
                         # 每次搜索都覆盖前一次状态：后续成功搜索可以清除先前失败。
                         result.last_search_error = _extract_search_error(event.tool_result)
+                    elif event.tool_name == "web_fetch":
+                        fetch_failure = _extract_web_fetch_failure(event.tool_result)
+                        if fetch_failure is not None:
+                            result.web_fetch_failures.append(fetch_failure)
                     # role=tool 消息只进入 current_messages 观察快照；
                     # runtime 内部是否继续把工具结果喂给模型，由 EmbeddedRuntime/tool_loop 负责。
                     current_messages.append(
@@ -718,6 +760,20 @@ class GatewayRuntime:
         elif result.last_search_error:
             # 提示词不是安全边界。搜索失败时在 Gateway 层确定性覆盖模型的猜测性结论。
             safe_reply = _search_failure_reply(result.last_search_error)
+            result.texts = [safe_reply]
+            if current_assistant_index is not None:
+                current_messages[current_assistant_index]["content"] = safe_reply
+            else:
+                current_messages.append({"role": "assistant", "content": safe_reply})
+        elif (
+            result.tool_names
+            and all(name == "web_fetch" for name in result.tool_names)
+            and len(result.web_fetch_failures) == len(result.tool_names)
+        ):
+            # When a direct fetch attempt has no successful evidence, do not trust a model-written
+            # interpretation of the HTTP error. In particular, 404 describes one server response;
+            # it does not establish that a resource permanently does not exist.
+            safe_reply = _web_fetch_failure_reply(result.web_fetch_failures[-1])
             result.texts = [safe_reply]
             if current_assistant_index is not None:
                 current_messages[current_assistant_index]["content"] = safe_reply

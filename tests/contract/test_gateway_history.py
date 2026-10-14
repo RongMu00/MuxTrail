@@ -2,8 +2,10 @@
 
 from muxtrail.gateway.boot import (
     _extract_search_error,
+    _extract_web_fetch_failure,
     _history_for_model,
     _search_failure_reply,
+    _web_fetch_failure_reply,
 )
 
 
@@ -43,3 +45,15 @@ def test_search_failure_reply_rejects_factual_inference() -> None:
     assert "no official matches" in reply
     assert "does not show" in reply
     assert "does not exist" in reply
+
+
+def test_web_fetch_failure_reply_does_not_overstate_http_404() -> None:
+    failure = _extract_web_fetch_failure(
+        '{"ok": false, "status": 404, "error": "Fetch failed: HTTP 404"}'
+    )
+
+    assert failure is not None
+    reply = _web_fetch_failure_reply(failure)
+    assert "server returned HTTP 404" in reply
+    assert "does not prove" in reply
+    assert "No page content was available" in reply

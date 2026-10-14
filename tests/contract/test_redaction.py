@@ -7,7 +7,7 @@ def test_redaction_handles_keys_and_embedded_tokens() -> None:
     value = {
         "api_key": "sk-secret",
         "nested": {"authorization": "Bearer abcdefghijklmnop"},
-        "message": "request used xoxb-123456789-secret",
+        "message": "request used xoxb-short",
     }
 
     result = redact(value)

@@ -19,7 +19,7 @@ from muxtrail.core.logging import get_logger
 from muxtrail.core.redaction import redact
 from muxtrail.gateway.boot import GatewayRuntime
 from muxtrail.gateway.http.health import router as health_router
-from muxtrail.gateway.http.security import setup_security
+from muxtrail.gateway.http.security import resolve_allowed_origins, setup_security
 from muxtrail.gateway.methods.agent import handle_agent, handle_agent_wait
 from muxtrail.gateway.methods.channels import handle_channels_status
 from muxtrail.gateway.methods.config import (
@@ -108,9 +108,10 @@ def create_app(config: MuxTrailConfig | None = None, boot: bool = True) -> FastA
 
     app.state.gateway_state = state
     app.state.method_registry = method_registry
+    allowed_origins = resolve_allowed_origins(config)
 
     # HTTP routes
-    setup_security(app)
+    setup_security(app, allowed_origins)
     app.include_router(health_router)
 
     @app.get("/api/config")
@@ -211,6 +212,10 @@ def create_app(config: MuxTrailConfig | None = None, boot: bool = True) -> FastA
     # WebSocket endpoint
     @app.websocket("/ws")
     async def websocket_endpoint(ws: WebSocket) -> None:
+        origin = ws.headers.get("origin")
+        if origin and origin.rstrip("/") not in allowed_origins:
+            await ws.close(code=1008, reason="origin not allowed")
+            return
         await handle_websocket(ws, state, method_registry.as_dict())
 
     return app

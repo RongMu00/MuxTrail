@@ -6,8 +6,15 @@
         <h1>Runtime Workbench</h1>
       </div>
       <div class="top-metrics">
-        <span>Gateway: 18789</span>
-        <span>Workbench: 3001</span>
+        <a
+          v-if="accessLoginUrl && runtime.wsStatus !== 'connected'"
+          class="access-link"
+          :href="accessLoginUrl"
+          target="_blank"
+          rel="noreferrer"
+        >Authenticate gateway</a>
+        <span>Gateway: {{ gatewayLabel }}</span>
+        <span>Workbench: {{ workbenchLabel }}</span>
         <span>WebSocket: {{ connectionLabel(runtime.wsStatus) }}</span>
       </div>
     </header>
@@ -36,6 +43,10 @@ import RuntimeTimeline from '@/components/RuntimeTimeline.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 
 const runtime = useRuntimeStore()
+const accessLoginUrl = import.meta.env.VITE_MUXTRAIL_ACCESS_LOGIN_URL || ''
+const gatewayUrl = import.meta.env.VITE_MUXTRAIL_WS_URL || `ws://${location.host}/ws`
+const gatewayLabel = new URL(gatewayUrl).host
+const workbenchLabel = location.host
 
 function connectionLabel(status: string) {
   const labels: Record<string, string> = {
@@ -127,6 +138,13 @@ h1 {
   padding: 9px 11px;
   font: 700 10px/1 var(--mono);
   color: var(--muted);
+}
+.access-link {
+  background: #fff;
+  padding: 9px 11px;
+  font: 700 10px/1 var(--mono);
+  color: var(--accent);
+  text-decoration: none;
 }
 .workspace {
   flex: 0 0 calc(100dvh - 72px);

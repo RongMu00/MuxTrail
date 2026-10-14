@@ -1,9 +1,11 @@
 /** REST API client */
 
-const BASE = '/api'
+const BASE = (import.meta.env.VITE_MUXTRAIL_API_BASE || '/api').replace(/\/$/, '')
 
 export async function fetchJson<T>(path: string): Promise<T> {
-  const resp = await fetch(`${BASE}${path}`)
+  const resp = await fetch(`${BASE}${path}`, {
+    credentials: 'include',
+  })
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   return resp.json()
 }

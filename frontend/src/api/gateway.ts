@@ -10,6 +10,13 @@ export interface GatewayFrame {
   seq?: number
 }
 
+function defaultGatewayUrl() {
+  const configured = import.meta.env.VITE_MUXTRAIL_WS_URL
+  if (configured) return configured
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${location.host}/ws`
+}
+
 export class GatewayClient {
   private ws: WebSocket | null = null
   private connectPromise: Promise<any> | null = null
@@ -22,7 +29,7 @@ export class GatewayClient {
   private reconnectAttempt = 0
   private reconnectTimer: number | null = null
 
-  connect(url = `ws://${location.host}/ws`): Promise<any> {
+  connect(url = defaultGatewayUrl()): Promise<any> {
     if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve(true)
     if (this.connectPromise) return this.connectPromise
 

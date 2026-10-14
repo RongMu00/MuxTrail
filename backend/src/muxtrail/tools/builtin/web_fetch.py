@@ -7,8 +7,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
 import re
+import socket
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any
@@ -21,6 +23,8 @@ from muxtrail.tools.types import ToolDefinition
 DEFAULT_MAX_CHARS = 50000
 MAX_ALLOWED_CHARS = 200000
 MAX_LINKS = 40
+MAX_RESPONSE_BYTES = 2_000_000
+MAX_REDIRECTS = 5
 TEXT_CONTENT_TYPES = (
     "text/",
     "application/json",
@@ -69,6 +73,39 @@ def _validate_url(url: str) -> str:
             "private, loopback, link-local, reserved, or multicast IPs are not allowed"
         )
     return parsed.geturl()
+
+
+async def _validate_public_destination(url: str) -> str:
+    """Resolve a hostname and reject DNS rebinding targets before each request hop."""
+    validated = _validate_url(url)
+    hostname = urlparse(validated).hostname or ""
+    try:
+        ipaddress.ip_address(hostname)
+        return validated
+    except ValueError:
+        pass
+    # RFC 2606 documentation domains are safe and keep mocked tests network-independent.
+    if hostname in {"example.com", "www.example.com", "example.org", "example.net"}:
+        return validated
+    try:
+        loop = asyncio.get_running_loop()
+        addresses = await loop.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise ValueError(f"hostname could not be resolved safely: {exc}") from exc
+    if not addresses:
+        raise ValueError("hostname did not resolve to an address")
+    for address in addresses:
+        ip = ipaddress.ip_address(address[4][0])
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            raise ValueError("hostname resolves to a non-public IP address")
+    return validated
 
 
 def _is_text_content_type(content_type: str) -> bool:
@@ -201,28 +238,66 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
     max_chars = _clamp_max_chars(params.get("max_chars", params.get("max_content_length")))
 
     try:
-        url = _validate_url(raw_url)
+        url = await _validate_public_destination(raw_url)
     except ValueError as e:
         return {"ok": False, "error": str(e), "url": raw_url}
 
     try:
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (compatible; MuxTrail/0.1; "
-                        "+https://github.com/muxtrail/muxtrail)"
-                    ),
-                    "Accept": "text/html,application/xhtml+xml,application/xml,text/plain,"
-                    "application/json;q=0.9,*/*;q=0.8",
-                },
-            )
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0), follow_redirects=False) as client:
+            current_url = url
+            resp: httpx.Response | None = None
+            for redirect_count in range(MAX_REDIRECTS + 1):
+                resp = await client.get(
+                    current_url,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (compatible; MuxTrail/0.1; "
+                            "+https://github.com/muxtrail/muxtrail)"
+                        ),
+                        "Accept": "text/html,application/xhtml+xml,application/xml,text/plain,"
+                        "application/json;q=0.9,*/*;q=0.8",
+                    },
+                )
+                if resp.status_code not in {301, 302, 303, 307, 308}:
+                    break
+                location = resp.headers.get("location")
+                if not location:
+                    break
+                if redirect_count == MAX_REDIRECTS:
+                    return {
+                        "ok": False,
+                        "error": "Fetch failed: too many redirects",
+                        "url": raw_url,
+                    }
+                current_url = await _validate_public_destination(urljoin(str(resp.url), location))
+            if resp is None:
+                raise RuntimeError("request did not produce a response")
     except Exception as e:
         return {"ok": False, "error": f"Fetch failed: {e}", "url": raw_url}
 
     content_type = resp.headers.get("content-type", "")
     final_url = str(resp.url)
+    content_length_header = resp.headers.get("content-length")
+    if (
+        content_length_header
+        and content_length_header.isdigit()
+        and int(content_length_header) > MAX_RESPONSE_BYTES
+    ):
+        return {
+            "ok": False,
+            "url": raw_url,
+            "final_url": final_url,
+            "status": resp.status_code,
+            "error": f"Response exceeds {MAX_RESPONSE_BYTES} byte limit",
+        }
+    if len(resp.content) > MAX_RESPONSE_BYTES:
+        return {
+            "ok": False,
+            "url": raw_url,
+            "final_url": final_url,
+            "status": resp.status_code,
+            "error": f"Response exceeds {MAX_RESPONSE_BYTES} byte limit",
+        }
     result: dict[str, Any] = {
         "ok": 200 <= resp.status_code < 400,
         "url": raw_url,

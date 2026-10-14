@@ -3,13 +3,15 @@
 # 阅读提示：注册、执行和限制工具调用。
 # 运行影响：仅用于源码阅读，不改变运行逻辑。
 
-"""联网搜索工具：优先使用 Bocha，没有 API Key 时降级到 DuckDuckGo HTML 搜索。"""
+"""Structured web search with Tavily as the primary provider."""
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
-from typing import Any
+import time
+from typing import Any, TypeVar
 from urllib.parse import unquote, urlparse
 from xml.etree import ElementTree
 
@@ -18,6 +20,7 @@ import httpx
 from muxtrail.tools.types import ToolDefinition
 
 BOCHA_WEB_SEARCH_URL = "https://api.bocha.cn/v1/web-search"
+TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 DEFAULT_RESULT_COUNT = 8
 MAX_RESULT_COUNT = 20
 BING_RSS_SEARCH_URL = "https://www.bing.com/search"
@@ -33,6 +36,8 @@ WEB_SEARCH_PROMPT_INSTRUCTIONS = (
     "results; do not infer that an event did not happen and do not guess factual conclusions. "
     "Do not call web_search for simple stable facts or purely local tasks."
 )
+
+SearchResult = TypeVar("SearchResult", bound=dict[str, Any])
 
 
 def _normalize_domains(value: Any) -> list[str]:
@@ -69,11 +74,11 @@ def _matches_domain(url: str, domain: str) -> bool:
 
 
 def _filter_results(
-    results: list[dict[str, str]], include: list[str], exclude: list[str]
-) -> list[dict[str, str]]:
-    filtered: list[dict[str, str]] = []
+    results: list[SearchResult], include: list[str], exclude: list[str]
+) -> list[SearchResult]:
+    filtered: list[SearchResult] = []
     for result in results:
-        url = result.get("url", "")
+        url = str(result.get("url", ""))
         if not url:
             continue
         if exclude and any(_matches_domain(url, domain) for domain in exclude):
@@ -130,8 +135,7 @@ def _result_matches_anchor(result: dict[str, str], anchor: str) -> bool:
     if not anchor:
         return True
     haystack = " ".join(
-        str(result.get(field, ""))
-        for field in ("title", "url", "snippet", "summary")
+        str(result.get(field, "")) for field in ("title", "url", "snippet", "summary")
     ).lower()
     return all(token.lower() in haystack for token in anchor.split())
 
@@ -171,6 +175,106 @@ def _bocha_result(item: dict[str, Any]) -> dict[str, str]:
         "summary": str(item.get("summary") or ""),
         "site_name": str(item.get("siteName") or item.get("site_name") or ""),
         "date_published": str(item.get("datePublished") or item.get("date_published") or ""),
+    }
+
+
+async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]:
+    """Call Tavily with bounded retries and return provider-neutral evidence."""
+    query = str(params.get("query") or "").strip()
+    if not query:
+        raise ValueError("query is required")
+    count = _clamp_count(params.get("count", params.get("max_results", DEFAULT_RESULT_COUNT)))
+    include = _normalize_domains(params.get("include_domains", params.get("include")))
+    exclude = _normalize_domains(params.get("exclude_domains", params.get("exclude")))
+    search_depth = str(params.get("search_depth") or "basic")
+    if search_depth not in {"basic", "advanced"}:
+        raise ValueError("search_depth must be 'basic' or 'advanced'")
+    topic = str(params.get("topic") or "general")
+    if topic not in {"general", "news", "finance"}:
+        raise ValueError("topic must be 'general', 'news', or 'finance'")
+    body: dict[str, Any] = {
+        "api_key": api_key,
+        "query": query,
+        "max_results": count,
+        "search_depth": search_depth,
+        "topic": topic,
+        "include_domains": include,
+        "exclude_domains": exclude,
+        "include_answer": False,
+        "include_raw_content": False,
+    }
+    started = time.monotonic()
+    last_error = ""
+    retry_count = 0
+    for attempt in range(3):
+        retry_count = attempt
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
+                response = await client.post(TAVILY_SEARCH_URL, json=body)
+            if response.status_code == 429 or response.status_code >= 500:
+                last_error = f"HTTP {response.status_code}"
+                if attempt < 2:
+                    await asyncio.sleep(0.25 * (2**attempt))
+                    continue
+            if response.status_code in {401, 403}:
+                last_error = "authentication failed"
+            elif response.status_code != 200:
+                last_error = f"HTTP {response.status_code}"
+            else:
+                payload = response.json()
+                raw_results = payload.get("results") if isinstance(payload, dict) else []
+                raw_results = raw_results if isinstance(raw_results, list) else []
+                results: list[dict[str, Any]] = []
+                for rank, item in enumerate(raw_results, start=1):
+                    if not isinstance(item, dict):
+                        continue
+                    results.append(
+                        {
+                            "title": str(item.get("title") or ""),
+                            "url": str(item.get("url") or ""),
+                            "snippet": str(item.get("content") or ""),
+                            "content": str(item.get("content") or ""),
+                            "score": item.get("score"),
+                            "rank": rank,
+                        }
+                    )
+                results = _filter_results(results, include, exclude)
+                result: dict[str, Any] = {
+                    "ok": True,
+                    "provider": "tavily",
+                    "query": query,
+                    "search_depth": search_depth,
+                    "topic": topic,
+                    "include_domains": include,
+                    "exclude_domains": exclude,
+                    "results": results[:count],
+                    "result_count": len(results[:count]),
+                    "duration_ms": int((time.monotonic() - started) * 1000),
+                    "retry_count": retry_count,
+                    "provider_metadata": {"request_id": payload.get("request_id")},
+                }
+                if not results:
+                    result["warning"] = (
+                        "Tavily returned zero usable results. This is not evidence that the "
+                        "information does not exist."
+                    )
+                return result
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            last_error = type(exc).__name__
+            if attempt < 2:
+                await asyncio.sleep(0.25 * (2**attempt))
+                continue
+    return {
+        "ok": False,
+        "provider": "tavily",
+        "query": query,
+        "include_domains": include,
+        "exclude_domains": exclude,
+        "results": [],
+        "result_count": 0,
+        "duration_ms": int((time.monotonic() - started) * 1000),
+        "retry_count": retry_count,
+        "error": f"Tavily search failed: {last_error or 'unknown provider error'}",
     }
 
 
@@ -264,8 +368,7 @@ async def _bocha_search(params: dict[str, Any], api_key: str) -> dict[str, Any]:
         response["retryable"] = True
         if include:
             response["error"] = (
-                "Bocha returned no usable results matching required domains: "
-                + ", ".join(include)
+                "Bocha returned no usable results matching required domains: " + ", ".join(include)
             )
         else:
             response["error"] = "Bocha returned no usable results"
@@ -416,9 +519,23 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
                 "third-party results."
             ),
         }
-    api_key = os.environ.get("BOCHA_API_KEY", "").strip()
-    if api_key:
-        primary = await _bocha_search(params, api_key)
+    tavily_key = os.environ.get("TAVILY_API_KEY", "").strip()
+    bocha_key = os.environ.get("BOCHA_API_KEY", "").strip()
+    if tavily_key:
+        primary = await _tavily_search(params, tavily_key)
+        if primary.get("ok"):
+            return primary
+        if bocha_key:
+            fallback = await _bocha_search(params, bocha_key)
+            fallback["fallback_from"] = "tavily"
+            fallback["fallback_reason"] = primary.get("error", "Tavily failed")
+            fallback["primary_error"] = primary.get("error", "")
+            return fallback
+        return primary
+    if bocha_key:
+        primary = await _bocha_search(params, bocha_key)
+        primary["fallback_from"] = "tavily"
+        primary["fallback_reason"] = "TAVILY_API_KEY is not configured"
         if primary.get("results") or not primary.get("retryable"):
             return primary
     else:
@@ -448,11 +565,10 @@ def create_web_search_tool() -> ToolDefinition:
     return ToolDefinition(
         name="web_search",
         description=(
-            "Search the web for current, factual, or deep-research information. Uses Bocha "
-            "Web Search API when BOCHA_API_KEY is configured, otherwise tries DuckDuckGo. If "
-            "the primary provider has no usable results, retries focused queries and uses Bing "
-            "RSS as a fallback. Use returned result fields directly as evidence; do not "
-            "fabricate citations."
+            "Search the web for structured evidence. Tavily is the primary provider when "
+            "TAVILY_API_KEY is configured. Results include titles, URLs, excerpts, ranking, "
+            "provider metadata, retry count, and timing. Bocha may be used only as an explicit "
+            "fallback. Fetch important sources before answering and never fabricate citations."
         ),
         input_schema={
             "type": "object",
@@ -474,6 +590,16 @@ def create_web_search_tool() -> ToolDefinition:
                     "default": "noLimit",
                 },
                 "summary": {"type": "boolean", "default": True},
+                "search_depth": {
+                    "type": "string",
+                    "enum": ["basic", "advanced"],
+                    "default": "basic",
+                },
+                "topic": {
+                    "type": "string",
+                    "enum": ["general", "news", "finance"],
+                    "default": "general",
+                },
                 "include": {
                     "type": "array",
                     "items": {"type": "string"},

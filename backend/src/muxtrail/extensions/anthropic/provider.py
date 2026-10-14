@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from muxtrail.agents.providers.schema_normalize import normalize_tools_for_anthropic
+from muxtrail.core.errors import safe_provider_error
 from muxtrail.core.logging import get_logger
 
 log = get_logger("provider.anthropic")
@@ -75,9 +76,12 @@ class AnthropicProvider:
         ):
             if resp.status_code != 200:
                 error = await resp.aread()
+                log.error(
+                    "anthropic_api_error", status=resp.status_code, body=error.decode()[:1000]
+                )
                 yield {
                     "type": "error",
-                    "error": f"Anthropic API {resp.status_code}: {error.decode()[:200]}",
+                    "error": safe_provider_error("Anthropic", resp.status_code),
                 }
                 return
             current_tool: dict[str, str] = {}

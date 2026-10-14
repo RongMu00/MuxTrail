@@ -110,7 +110,7 @@ class EmbeddedRuntime:
     ) -> AsyncIterator[AgentEvent]:
         """Single inference attempt with tool loop."""
         # 先根据 request.provider_id 找到模型供应商。
-        # 例如飞书链路里 Gateway 会把 provider_id 设成 dashscope，model_id 设成 qwen3.6-max-preview。
+        # For example, Gateway may select DashScope with a Qwen model for a channel run.
         provider = None
         if self._provider_registry:
             provider = self._provider_registry.get(request.provider_id)
@@ -209,7 +209,7 @@ class EmbeddedRuntime:
 
             try:
                 # provider.create_stream 是模型供应商适配层。
-                # 对 DashScope/OpenAI 这类兼容接口，它会把 SSE chunk 统一成 text_delta/tool_call/usage/error。
+                # Provider adapters normalize streaming chunks into runtime event types.
                 async for chunk in provider.create_stream(
                     model=request.model_id,
                     messages=messages,
@@ -280,6 +280,12 @@ class EmbeddedRuntime:
             else:
                 # 没有 tool_registry 时无法执行工具，只能结束循环。
                 break
+        else:
+            yield AgentEvent(
+                type=AgentEventType.ERROR,
+                error=f"Tool loop exceeded the maximum of {MAX_TOOL_TURNS} turns",
+            )
+            return
 
         if total_input > 0 or total_output > 0:
             # 所有模型轮次的 usage 汇总成一个 USAGE 事件，Gateway 会写入 session 统计。

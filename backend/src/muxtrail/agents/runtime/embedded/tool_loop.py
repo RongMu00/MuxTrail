@@ -6,6 +6,7 @@
 """Tool execution loop — model calls tools, gets results, continues reasoning."""
 
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -61,7 +62,9 @@ async def run_tool_loop(
             )
         )
 
+        started = time.monotonic()
         result = await execute_tool(tool_registry, tool_policy, tool_name, tool_params, context)
+        duration_ms = int((time.monotonic() - started) * 1000)
 
         output_str = ""
         if result.success:
@@ -79,6 +82,7 @@ async def run_tool_loop(
                 type=AgentEventType.TOOL_CALL_RESULT,
                 tool_name=tool_name,
                 tool_result=output_str,
+                metadata={"durationMs": duration_ms, "success": result.success},
             )
         )
 

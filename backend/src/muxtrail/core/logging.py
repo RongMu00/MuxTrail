@@ -11,6 +11,15 @@ from typing import Any
 
 import structlog
 
+from muxtrail.core.redaction import redact
+
+
+def _redact_event(
+    logger: object, method_name: str, event_dict: structlog.types.EventDict
+) -> structlog.types.EventDict:
+    redacted = redact(event_dict)
+    return redacted if isinstance(redacted, dict) else {"event": "[redacted]"}
+
 
 def setup_logging(level: str = "info", json_format: bool = True) -> None:
     """Configure structlog with JSON or console output."""
@@ -22,6 +31,7 @@ def setup_logging(level: str = "info", json_format: bool = True) -> None:
         structlog.processors.StackInfoRenderer(),
         structlog.dev.set_exc_info,
         structlog.processors.TimeStamper(fmt="iso"),
+        _redact_event,
     ]
 
     if json_format:

@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket
 
 from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
 from muxtrail.core.logging import get_logger
+from muxtrail.core.redaction import redact
 from muxtrail.gateway.boot import GatewayRuntime
 from muxtrail.gateway.http.health import router as health_router
 from muxtrail.gateway.http.security import setup_security
@@ -114,7 +115,8 @@ def create_app(config: MuxTrailConfig | None = None, boot: bool = True) -> FastA
 
     @app.get("/api/config")
     async def get_config() -> dict[str, object]:
-        return {"config": state.config.model_dump(exclude_none=True, by_alias=True)}
+        safe = redact(state.config.model_dump(exclude_none=True, by_alias=True))
+        return {"config": safe if isinstance(safe, dict) else {}}
 
     @app.patch("/api/config")
     async def patch_config(patch: dict[str, object]) -> dict[str, object]:

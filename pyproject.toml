@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "muxtrail"
 version = "0.1.0"
 requires-python = ">=3.11"
-description = "Multi-channel AI gateway — Python backend"
+description = "Observable local-first AI gateway and runtime workbench"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "MuxTrail contributors" }]
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
@@ -52,3 +55,7 @@ testpaths = ["tests"]
 [tool.mypy]
 strict = true
 python_version = "3.11"
+
+[[tool.mypy.overrides]]
+module = ["langchain_core.*", "langgraph.*"]
+ignore_missing_imports = true

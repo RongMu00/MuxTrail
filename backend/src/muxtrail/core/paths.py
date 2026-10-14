@@ -9,14 +9,12 @@ import os
 from pathlib import Path
 
 DEFAULT_STATE_DIR_NAME = ".muxtrail-state"
-LEGACY_STATE_DIR_NAME = ".openclaw-state"
 DEFAULT_CONFIG_FILENAME = "muxtrail.json"
-LEGACY_CONFIG_FILENAME = "clawdbot.json"
 DEFAULT_GATEWAY_PORT = 18789
 
 
 def resolve_state_dir(env: dict[str, str] | None = None) -> Path:
-    """Resolve the state directory (~/.muxtrail by default)."""
+    """Resolve the state directory (~/.muxtrail-state by default)."""
     raw_env = env if env is not None else dict(os.environ)
 
     # Explicit override
@@ -29,11 +27,6 @@ def resolve_state_dir(env: dict[str, str] | None = None) -> Path:
     default_path = home / DEFAULT_STATE_DIR_NAME
     if default_path.exists():
         return default_path
-
-    # Legacy fallback
-    legacy_path = home / LEGACY_STATE_DIR_NAME
-    if legacy_path.exists():
-        return legacy_path
 
     # Create default
     return default_path
@@ -54,11 +47,6 @@ def resolve_config_path(state_dir: Path | None = None, env: dict[str, str] | Non
     default_path = state_dir / DEFAULT_CONFIG_FILENAME
     if default_path.exists():
         return default_path
-
-    # Legacy
-    legacy_path = state_dir / LEGACY_CONFIG_FILENAME
-    if legacy_path.exists():
-        return legacy_path
 
     return default_path
 

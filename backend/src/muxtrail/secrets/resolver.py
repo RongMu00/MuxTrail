@@ -20,7 +20,7 @@ def resolve_secret(ref: dict[str, Any] | str, env: dict[str, str] | None = None)
     - Plain string: returned as-is
     - {"env": "VAR_NAME"}: read from environment
     - {"file": "/path/to/secret"}: read from file
-    - {"exec": "command"}: execute command and use stdout
+    - {"exec": ["command", "arg"]}: execute an argv list and use stdout
     """
     if isinstance(ref, str):
         return ref
@@ -40,12 +40,24 @@ def resolve_secret(ref: dict[str, Any] | str, env: dict[str, str] | None = None)
         return path.read_text(encoding="utf-8").strip()
 
     if "exec" in ref:
+        command = ref["exec"]
+        if (
+            not isinstance(command, list)
+            or not command
+            or not all(isinstance(item, str) and item for item in command)
+        ):
+            raise ConfigError("Secret exec must be a non-empty argv list")
         try:
             result = subprocess.run(
-                ref["exec"], shell=True, capture_output=True, text=True, timeout=10
+                command,
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             if result.returncode != 0:
-                raise ConfigError(f"Secret exec failed: {result.stderr}")
+                raise ConfigError("Secret exec failed")
             return result.stdout.strip()
         except subprocess.TimeoutExpired as e:
             raise ConfigError("Secret exec timed out") from e

@@ -71,7 +71,7 @@ class McpConfig(BaseModel):
 
 
 class MuxTrailConfig(BaseModel):
-    """Top-level config file model. Matches ~/.muxtrail/muxtrail.json.
+    """Top-level config file model. Matches ~/.muxtrail-state/muxtrail.json.
 
     Uses extra='allow' so unknown TS-side fields don't break loading.
     """

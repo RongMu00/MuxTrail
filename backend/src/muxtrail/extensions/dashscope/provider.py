@@ -13,10 +13,11 @@ from typing import Any
 import httpx
 
 from muxtrail.agents.providers.schema_normalize import (
-# generated: 02V54 01R14
+    # generated: 02V54 01R14
     normalize_messages_for_openai_compatible,
     normalize_tools_for_openai,
 )
+from muxtrail.core.errors import safe_provider_error
 from muxtrail.core.logging import get_logger
 
 log = get_logger("provider.dashscope")
@@ -83,7 +84,10 @@ class DashScopeProvider:
             if resp.status_code != 200:
                 error_body = await resp.aread()
                 log.error("dashscope_api_error", status=resp.status_code, body=error_body.decode())
-                yield {"type": "error", "error": f"API error {resp.status_code}"}
+                yield {
+                    "type": "error",
+                    "error": safe_provider_error("DashScope", resp.status_code),
+                }
                 return
 
             tool_call_buffers: dict[int, dict[str, str]] = {}
@@ -127,9 +131,7 @@ class DashScopeProvider:
                 if finish_reason in ("tool_calls", "stop") and tool_call_buffers:
                     for index, buffer in sorted(tool_call_buffers.items()):
                         try:
-                            params = (
-                                json.loads(buffer["arguments"]) if buffer["arguments"] else {}
-                            )
+                            params = json.loads(buffer["arguments"]) if buffer["arguments"] else {}
                         except json.JSONDecodeError:
                             params = {}
                         yield {

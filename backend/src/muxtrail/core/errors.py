@@ -58,3 +58,24 @@ class ChannelError(MuxTrailError):
 class AgentError(MuxTrailError):
     def __init__(self, message: str, details: Any = None) -> None:
         super().__init__(message, code="AGENT_ERROR", details=details)
+
+
+def safe_provider_error(provider: str, status: int) -> str:
+    """Map provider HTTP status to a useful user-safe category."""
+    if status == 401:
+        reason = "invalid API key"
+    elif status == 403:
+        reason = "authentication or permission denied"
+    elif status == 402:
+        reason = "insufficient credits or billing access"
+    elif status == 404:
+        reason = "unsupported or unavailable model"
+    elif status == 429:
+        reason = "rate limited"
+    elif status in {408, 504}:
+        reason = "request timed out"
+    elif status >= 500:
+        reason = "provider server error"
+    else:
+        reason = f"request failed (HTTP {status})"
+    return f"{provider} provider error: {reason}"

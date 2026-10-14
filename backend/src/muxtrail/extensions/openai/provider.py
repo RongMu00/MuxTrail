@@ -16,6 +16,7 @@ from muxtrail.agents.providers.schema_normalize import (
     normalize_messages_for_openai_compatible,
     normalize_tools_for_openai,
 )
+from muxtrail.core.errors import safe_provider_error
 from muxtrail.core.logging import get_logger
 
 log = get_logger("provider.openai")
@@ -68,9 +69,10 @@ class OpenAIProvider:
         ):
             if resp.status_code != 200:
                 error = await resp.aread()
+                log.error("openai_api_error", status=resp.status_code, body=error.decode()[:1000])
                 yield {
                     "type": "error",
-                    "error": f"OpenAI API {resp.status_code}: {error.decode()[:200]}",
+                    "error": safe_provider_error("OpenAI", resp.status_code),
                 }
                 return
             tc_bufs: dict[int, dict[str, str]] = {}

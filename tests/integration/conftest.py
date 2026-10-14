@@ -7,7 +7,7 @@
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from openclaw.gateway.app import create_app
+from muxtrail.gateway.app import create_app
 
 
 @pytest.fixture

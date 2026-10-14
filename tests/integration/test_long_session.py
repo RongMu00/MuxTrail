@@ -15,14 +15,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from openclaw.agents.runtime.embedded.compaction import (
+from muxtrail.agents.runtime.embedded.compaction import (
     CompactionCheckpoint,
     compact_messages,
     should_compact,
 )
-from openclaw.sessions.compaction import CompactionStore
-from openclaw.sessions.store import SessionStore
-from openclaw.sessions.transcript import TranscriptManager
+from muxtrail.sessions.compaction import CompactionStore
+from muxtrail.sessions.store import SessionStore
+from muxtrail.sessions.transcript import TranscriptManager
 
 
 def _build_long_transcript(

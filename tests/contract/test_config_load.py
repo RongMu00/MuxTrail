@@ -12,9 +12,9 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from openclaw.config.loader import load_config
-from openclaw.contracts.config.types_openclaw import OpenClawConfig
-from openclaw.core.env import load_default_env_files, parse_env_assignment
+from muxtrail.config.loader import load_config
+from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
+from muxtrail.core.env import load_default_env_files, parse_env_assignment
 
 if TYPE_CHECKING:
     import pytest
@@ -25,7 +25,7 @@ FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 class TestConfigLoad:
     def test_load_real_config(self) -> None:
         data = json.loads((FIXTURES_DIR / "real_config.json").read_text())
-        config = OpenClawConfig.model_validate(data)
+        config = MuxTrailConfig.model_validate(data)
         assert config.gateway is not None
         assert config.gateway.port == 18789
         assert config.gateway.auth is not None
@@ -38,7 +38,7 @@ class TestConfigLoad:
 
     def test_round_trip(self) -> None:
         data = json.loads((FIXTURES_DIR / "real_config.json").read_text())
-        config = OpenClawConfig.model_validate(data)
+        config = MuxTrailConfig.model_validate(data)
         dumped = json.loads(config.model_dump_json(exclude_none=True, by_alias=True))
         # Key fields survive round-trip
         assert dumped["gateway"]["port"] == 18789
@@ -46,27 +46,27 @@ class TestConfigLoad:
         assert dumped["channels"]["feishu"]["enabled"] is True
 
     def test_empty_config(self) -> None:
-        config = OpenClawConfig.model_validate({})
+        config = MuxTrailConfig.model_validate({})
         assert config.gateway is None
         assert config.channels is None
 
     def test_unknown_fields_allowed(self) -> None:
-        config = OpenClawConfig.model_validate({"futureField": "value"})
+        config = MuxTrailConfig.model_validate({"futureField": "value"})
         assert config.model_extra is not None
 
-    def test_load_config_uses_openclaw_config_path(self, tmp_path: Path) -> None:
-        config_path = tmp_path / "openclaw.json"
+    def test_load_config_uses_muxtrail_config_path(self, tmp_path: Path) -> None:
+        config_path = tmp_path / "muxtrail.json"
         config_path.write_text('{"gateway": {"port": 19001}}\n', encoding="utf-8")
 
-        config = load_config(env={"OPENCLAW_CONFIG_PATH": str(config_path)})
+        config = load_config(env={"MUXTRAIL_CONFIG_PATH": str(config_path)})
 
         assert config.gateway is not None
         assert config.gateway.port == 19001
 
     def test_load_config_uses_home_default_path(self, tmp_path: Path) -> None:
-        state_dir = tmp_path / ".openclaw"
+        state_dir = tmp_path / ".muxtrail"
         state_dir.mkdir()
-        (state_dir / "openclaw.json").write_text(
+        (state_dir / "muxtrail.json").write_text(
             '{"channels": {"feishu": {"enabled": true}}}\n',
             encoding="utf-8",
         )

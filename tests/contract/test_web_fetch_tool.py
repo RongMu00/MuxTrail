@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from openclaw.tools.builtin.web_fetch import create_web_fetch_tool, extract_text
+from muxtrail.tools.builtin.web_fetch import create_web_fetch_tool, extract_text
 
 
 @pytest.mark.asyncio

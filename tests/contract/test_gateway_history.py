@@ -1,6 +1,6 @@
 """Contract tests for model-facing transcript history."""
 
-from openclaw.gateway.boot import (
+from muxtrail.gateway.boot import (
     _extract_search_error,
     _history_for_model,
     _search_failure_reply,

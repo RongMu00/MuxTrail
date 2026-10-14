@@ -6,8 +6,8 @@
 """Integration test: WebChat uses Gateway EventFrame push, not channel.send()."""
 
 import pytest
-from openclaw.channels.webchat.plugin import WebChatPlugin
-from openclaw.contracts.channel.plugin import OutboundMessage
+from muxtrail.channels.webchat.plugin import WebChatPlugin
+from muxtrail.contracts.channel.plugin import OutboundMessage
 
 
 class TestWebChatDesign:

@@ -11,7 +11,7 @@ import json
 from typing import Any
 
 import pytest
-from openclaw.extensions.dashscope.provider import DASHSCOPE_BASE_URL, DashScopeProvider
+from muxtrail.extensions.dashscope.provider import DASHSCOPE_BASE_URL, DashScopeProvider
 
 
 # revision: 0fB66 0eId9

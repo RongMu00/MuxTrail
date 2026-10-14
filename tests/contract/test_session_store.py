@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from openclaw.contracts.session.entry import SessionEntry
-from openclaw.contracts.session.transcript import TranscriptLine
+from muxtrail.contracts.session.entry import SessionEntry
+from muxtrail.contracts.session.transcript import TranscriptLine
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 
@@ -56,7 +56,7 @@ class TestTranscript:
 
 class TestPluginManifest:
     def test_load_anthropic_manifest(self) -> None:
-        from openclaw.contracts.plugin.manifest import PluginManifest
+        from muxtrail.contracts.plugin.manifest import PluginManifest
 
         data = json.loads((FIXTURES_DIR / "plugin_manifests" / "anthropic.json").read_text())
         manifest = PluginManifest.model_validate(data)
@@ -65,7 +65,7 @@ class TestPluginManifest:
         assert "anthropic" in manifest.providers
 
     def test_load_feishu_manifest(self) -> None:
-        from openclaw.contracts.plugin.manifest import PluginManifest
+        from muxtrail.contracts.plugin.manifest import PluginManifest
 
         path = FIXTURES_DIR / "plugin_manifests" / "feishu.json"
         if path.exists():

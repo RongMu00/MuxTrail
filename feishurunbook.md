@@ -1,13 +1,13 @@
-feishu# OpenClaw-Py 飞书接入操作文档
+feishu# MuxTrail 飞书接入操作文档
 
-本文档用于把 `openclaw-py` 跑通到飞书机器人，并列出当前能用的能力边界。
+本文档用于把 `muxtrail-py` 跑通到飞书机器人，并列出当前能用的能力边界。
 
 ## 1. 本地服务启动
 
 ### 1.1 安装依赖
 
 ```bash
-cd openclaw-py
+cd muxtrail-py
 python -m pip install -e ".[dev]"
 ```
 
@@ -28,28 +28,28 @@ FEISHU_APP_ID
 FEISHU_APP_SECRET
 FEISHU_VERIFICATION_TOKEN
 FEISHU_ENCRYPT_KEY
-OPENCLAW_FEISHU_INTERNAL_SECRET
-OPENCLAW_FEISHU_DOCS_WRITE_ENABLED
+MUXTRAIL_FEISHU_INTERNAL_SECRET
+MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED
 FEISHU_DOCS_BASE_URL
 ```
 
 ### 1.3 启动网关
 
 ```bash
-cd openclaw-py
-openclaw gateway run --host 127.0.0.1 --port 18789
+cd muxtrail-py
+muxtrail gateway run --host 127.0.0.1 --port 18789
 ```
 
-如果 `openclaw` 命令没有安装到当前 shell，可以用：
+如果 `muxtrail` 命令没有安装到当前 shell，可以用：
 
 ```bash
-python -m openclaw.cli.main gateway run --host 127.0.0.1 --port 18789
+python -m muxtrail.cli.main gateway run --host 127.0.0.1 --port 18789
 ```
 
 启动时会自动读取以下位置，前面的优先级更高：
 
 ```text
-openclaw-py/.env
+muxtrail-py/.env
 仓库根目录 .env
 仓库根目录 process.md
 ```
@@ -203,17 +203,17 @@ im:message:send_as_bot            # 机器人发消息
 这个接口用于后续 sidecar 或本地模拟，不直接替代飞书长连接。启动网关后，在另一个终端执行：
 
 ```bash
-cd openclaw-py
+cd muxtrail-py
 set -a
 . ./.env
 set +a
 
 body='{"accountId":"default","eventType":"im.message.receive_v1","event":{"sender":{"sender_id":{"open_id":"ou_local_test"}},"message":{"message_id":"om_local_test","chat_id":"oc_local_test","chat_type":"p2p","message_type":"text","content":"{\"text\":\"本地飞书事件测试\"}"}}}'
-sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$OPENCLAW_FEISHU_INTERNAL_SECRET" -binary | xxd -p -c 256)
+sig=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$MUXTRAIL_FEISHU_INTERNAL_SECRET" -binary | xxd -p -c 256)
 
 curl -sS -X POST http://127.0.0.1:18789/internal/channels/feishu/events \
   -H "content-type: application/json" \
-  -H "x-openclaw-signature: sha256=$sig" \
+  -H "x-muxtrail-signature: sha256=$sig" \
   --data "$body"
 ```
 
@@ -230,14 +230,14 @@ curl -sS -X POST http://127.0.0.1:18789/internal/channels/feishu/events \
 文档读取和搜索默认可用。可以在飞书里直接问：
 
 ```text
-@机器人 搜索飞书文档里和 openclaw 有关的内容
+@机器人 搜索飞书文档里和 muxtrail 有关的内容
 @机器人 读取这个飞书文档的正文：https://xxx.feishu.cn/docx/xxxx
 ```
 
 创建、更新、删除文档属于写操作，默认被保护。确认权限和使用范围后，把 `.env` 改成：
 
 ```text
-OPENCLAW_FEISHU_DOCS_WRITE_ENABLED=true
+MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED=true
 ```
 
 如果希望机器人回复可点击文档链接，可以额外配置企业云文档根域名：
@@ -259,7 +259,7 @@ BOCHA_API_KEY=你的 Bocha API Key
 然后重启网关，再测试：
 
 ```text
-@机器人 创建一个飞书文档，标题是 OpenClaw 测试文档，正文写一段项目说明
+@机器人 创建一个飞书文档，标题是 MuxTrail 测试文档，正文写一段项目说明
 ```
 
 含公式内容建议让机器人直接创建文档，不要把公式作为普通 Markdown 文本转发。当前 `feishu_docs_create_with_content`
@@ -282,7 +282,7 @@ BOCHA_API_KEY=你的 Bocha API Key
 - 飞书文档 OpenAPI 通用工具：`feishu_docs_api`。
 - 飞书文档纯文本读取：`feishu_docs_raw_content`。
 - 飞书文档搜索：`feishu_docs_search`。
-- 飞书文档创建：`feishu_docs_create`，需要 `OPENCLAW_FEISHU_DOCS_WRITE_ENABLED=true`。
+- 飞书文档创建：`feishu_docs_create`，需要 `MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED=true`。
 - 飞书文档创建并写入正文：`feishu_docs_create_with_content`，会把飞书消息发送者加为协作者，并把 LaTeX 公式写成飞书公式元素。
 - 飞书云空间文件夹清单：`feishu_docs_list_folder`。
 - 通过 `feishu_docs_api` 覆盖 `docx`、旧版 `doc`、`drive`、`wiki`、`sheets`、`bitable`、`mindnote`、`slides` 和 `suite/docs-api` 下的云文档 OpenAPI。

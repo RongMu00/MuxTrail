@@ -11,11 +11,11 @@ import asyncio
 from typing import Any
 
 import pytest
-from openclaw.agents.providers.registry import ProviderRegistry
-from openclaw.agents.runtime.embedded.runner import EmbeddedRuntime
-from openclaw.contracts.agent.runtime import AgentEventType, AgentRunRequest
-from openclaw.tools.registry import ToolRegistry
-from openclaw.tools.types import ToolDefinition
+from muxtrail.agents.providers.registry import ProviderRegistry
+from muxtrail.agents.runtime.embedded.runner import EmbeddedRuntime
+from muxtrail.contracts.agent.runtime import AgentEventType, AgentRunRequest
+from muxtrail.tools.registry import ToolRegistry
+from muxtrail.tools.types import ToolDefinition
 
 
 class ToolCallingProvider:

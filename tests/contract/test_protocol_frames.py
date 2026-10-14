@@ -12,15 +12,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from openclaw.contracts.protocol.frames import (
+from muxtrail.contracts.protocol.frames import (
     EventFrame,
     GatewayFrame,
     RequestFrame,
     ResponseFrame,
 )
-from openclaw.contracts.protocol.hello import ConnectParams, HelloOk
-from openclaw.contracts.protocol.snapshot import Snapshot, StateVersion
-from openclaw.contracts.protocol.version import PROTOCOL_VERSION
+from muxtrail.contracts.protocol.hello import ConnectParams, HelloOk
+from muxtrail.contracts.protocol.snapshot import Snapshot, StateVersion
+from muxtrail.contracts.protocol.version import PROTOCOL_VERSION
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures" / "protocol_frames"
 

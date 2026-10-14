@@ -1,6 +1,6 @@
-# OpenClaw-Py
+# MuxTrail
 
-OpenClaw-Py 是一个本地 AI Gateway。它把浏览器工作台、飞书机器人、模型供应商和工具调用接在一起，用来观察一条消息从入口到模型、工具、回复的完整执行链路。
+MuxTrail 是一个本地 AI Gateway。它把浏览器工作台、飞书机器人、模型供应商和工具调用接在一起，用来观察一条消息从入口到模型、工具、回复的完整执行链路。
 
 当前重点能力：
 
@@ -36,7 +36,7 @@ npm install -g pnpm
 从仓库根目录进入 Python 项目：
 
 ```bash
-cd openclaw-py
+cd muxtrail-py
 ```
 
 安装后端：
@@ -80,7 +80,7 @@ BOCHA_API_KEY=你的 Bocha Key
 FEISHU_APP_ID=你的飞书 App ID
 FEISHU_APP_SECRET=你的飞书 App Secret
 FEISHU_DOCS_BASE_URL=https://你的企业域名.feishu.cn
-OPENCLAW_FEISHU_DOCS_WRITE_ENABLED=true
+MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED=true
 ```
 
 `.env` 会被 Git 忽略，不要把真实密钥提交到仓库。
@@ -90,14 +90,14 @@ OPENCLAW_FEISHU_DOCS_WRITE_ENABLED=true
 普通本地启动：
 
 ```bash
-python -m openclaw.cli.main gateway run --host 127.0.0.1 --port 18789
+python -m muxtrail.cli.main gateway run --host 127.0.0.1 --port 18789
 ```
 
 如果要启用飞书长连接配置：
 
 ```bash
-OPENCLAW_CONFIG_PATH=examples/openclaw.feishu.example.json \
-python -m openclaw.cli.main gateway run --host 127.0.0.1 --port 18789
+MUXTRAIL_CONFIG_PATH=examples/muxtrail.feishu.example.json \
+python -m muxtrail.cli.main gateway run --host 127.0.0.1 --port 18789
 ```
 
 看到类似日志说明后端启动成功：
@@ -121,7 +121,7 @@ curl -sS http://127.0.0.1:18789/api/channels/status
 另开一个终端：
 
 ```bash
-cd openclaw-py/frontend
+cd muxtrail-py/frontend
 pnpm dev --host 127.0.0.1 --port 3001
 ```
 
@@ -150,7 +150,7 @@ http://127.0.0.1:3001/walkthrough.html
 也可以单独启动：
 
 ```bash
-cd openclaw-py/frontend
+cd muxtrail-py/frontend
 pnpm dev --host 127.0.0.1 --port 3001
 ```
 
@@ -181,7 +181,7 @@ frontend/dist/walkthrough.html
 创建飞书文档测试：
 
 ```text
-建一个飞书文档，标题为 OpenClaw 测试，写一段项目说明，最后只回复文档链接
+建一个飞书文档，标题为 MuxTrail 测试，写一段项目说明，最后只回复文档链接
 ```
 
 联网研究加飞书文档测试：
@@ -217,8 +217,8 @@ pnpm build
 ## 9. 项目结构
 
 ```text
-openclaw-py/
-├── backend/src/openclaw/       # Python 后端
+muxtrail-py/
+├── backend/src/muxtrail/       # Python 后端
 │   ├── agents/                 # 模型运行、工具循环、system prompt
 │   ├── channels/               # 飞书、WebChat 等消息入口
 │   ├── cli/                    # 命令行入口

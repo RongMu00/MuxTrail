@@ -9,18 +9,18 @@ import asyncio
 from typing import Any
 
 import pytest
-from openclaw.agents.runtime.embedded.compaction import (
+from muxtrail.agents.runtime.embedded.compaction import (
     build_compaction_checkpoint,
     compact_messages,
     compute_compaction_reason,
     should_compact,
 )
-from openclaw.agents.runtime.embedded.overflow import (
+from muxtrail.agents.runtime.embedded.overflow import (
     check_overflow,
     truncate_oversized_tool_results,
 )
-from openclaw.agents.runtime.embedded.tool_result import truncate_tool_result
-from openclaw.contracts.agent.runtime import CompactionResult
+from muxtrail.agents.runtime.embedded.tool_result import truncate_tool_result
+from muxtrail.contracts.agent.runtime import CompactionResult
 
 
 def _make_messages(count: int, with_tools: bool = False) -> list[dict[str, Any]]:

@@ -12,11 +12,11 @@ from typing import Any
 
 import httpx
 import pytest
-from openclaw.tools.builtin.web_search import (
+from muxtrail.tools.builtin.web_search import (
     BOCHA_WEB_SEARCH_URL,
     create_web_search_tool,
 )
-from openclaw.tools.types import ToolContext
+from muxtrail.tools.types import ToolContext
 
 
 @pytest.mark.asyncio
@@ -34,8 +34,8 @@ async def test_web_search_uses_bocha_when_key_is_configured(
                 "webPages": {
                     "value": [
                         {
-                            "name": "OpenClaw Search",
-                            "url": "https://example.com/openclaw",
+                            "name": "MuxTrail Search",
+                            "url": "https://example.com/muxtrail",
                             "snippet": "A search result.",
                             "summary": "A summarized search result.",
                             "siteName": "Example",
@@ -49,17 +49,17 @@ async def test_web_search_uses_bocha_when_key_is_configured(
 
     tool = create_web_search_tool()
     assert tool.handler is not None
-    result = await tool.handler({"query": "OpenClaw", "count": 3, "freshness": "oneWeek"}, None)
+    result = await tool.handler({"query": "MuxTrail", "count": 3, "freshness": "oneWeek"}, None)
 
     assert result["provider"] == "bocha"
-    assert result["results"][0]["title"] == "OpenClaw Search"
+    assert result["results"][0]["title"] == "MuxTrail Search"
     assert result["results"][0]["site_name"] == "Example"
 
     request = httpx_mock.get_request()
     assert request is not None
     assert request.headers["authorization"] == "Bearer bocha-test-key"
     payload = json.loads(request.content.decode())
-    assert payload["query"] == "OpenClaw"
+    assert payload["query"] == "MuxTrail"
     assert payload["count"] == 3
     assert payload["freshness"] == "oneWeek"
     assert payload["summary"] is True

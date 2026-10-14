@@ -10,14 +10,14 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from openclaw.channels.feishu.auth import FEISHU_TOKEN_URL
-from openclaw.channels.feishu.docs import (
+from muxtrail.channels.feishu.auth import FEISHU_TOKEN_URL
+from muxtrail.channels.feishu.docs import (
     FEISHU_OPENAPI_BASE,
     FeishuDocsClient,
     is_mutation_request,
     normalize_feishu_docs_path,
 )
-from openclaw.tools.builtin.feishu_docs import (
+from muxtrail.tools.builtin.feishu_docs import (
     _extract_docx_id,
     _has_explicit_doc_write_intent,
     _markdown_to_docx_blocks,
@@ -25,8 +25,8 @@ from openclaw.tools.builtin.feishu_docs import (
     create_feishu_docs_raw_content_tool,
     create_feishu_docs_search_tool,
 )
-from openclaw.tools.policy import ToolPolicy
-from openclaw.tools.types import ToolContext
+from muxtrail.tools.policy import ToolPolicy
+from muxtrail.tools.types import ToolContext
 
 
 class TestFeishuDocsClient:
@@ -102,7 +102,7 @@ class TestFeishuDocsTools:
     ) -> None:
         monkeypatch.setenv("FEISHU_APP_ID", "cli_test")
         monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
-        monkeypatch.delenv("OPENCLAW_FEISHU_DOCS_WRITE_ENABLED", raising=False)
+        monkeypatch.delenv("MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED", raising=False)
         httpx_mock.add_response(
             method="POST",
             url=FEISHU_TOKEN_URL,
@@ -153,7 +153,7 @@ class TestFeishuDocsTools:
     ) -> None:
         monkeypatch.setenv("FEISHU_APP_ID", "cli_test")
         monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
-        monkeypatch.setenv("OPENCLAW_FEISHU_DOCS_WRITE_ENABLED", "true")
+        monkeypatch.setenv("MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED", "true")
         httpx_mock.add_response(
             method="POST",
             url=FEISHU_TOKEN_URL,
@@ -198,7 +198,7 @@ class TestFeishuDocsTools:
     ) -> None:
         monkeypatch.setenv("FEISHU_APP_ID", "cli_test")
         monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
-        monkeypatch.setenv("OPENCLAW_FEISHU_DOCS_WRITE_ENABLED", "true")
+        monkeypatch.setenv("MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED", "true")
         httpx_mock.add_response(
             method="POST",
             url=FEISHU_TOKEN_URL,
@@ -248,7 +248,7 @@ class TestFeishuDocsTools:
     ) -> None:
         monkeypatch.setenv("FEISHU_APP_ID", "cli_test")
         monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
-        monkeypatch.setenv("OPENCLAW_FEISHU_DOCS_WRITE_ENABLED", "true")
+        monkeypatch.setenv("MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED", "true")
 
         tool = create_feishu_docs_create_with_content_tool()
         assert tool.handler is not None

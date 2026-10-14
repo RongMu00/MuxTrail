@@ -2,7 +2,7 @@
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">OPENCLAW</p>
+        <p class="eyebrow">MUXTRAIL</p>
         <h1>运行时控制台</h1>
       </div>
       <div class="top-metrics">

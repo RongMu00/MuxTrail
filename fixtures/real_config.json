@@ -1,5 +1,5 @@
 {
-  "$schema": "https://openclaw.dev/config.schema.json",
+  "$schema": "https://muxtrail.dev/config.schema.json",
   "meta": {
     "lastTouchedVersion": "2026.4.12-beta.1",
     "lastTouchedAt": "2026-04-12T10:00:00Z"
@@ -24,7 +24,7 @@
   "agents": {
     "defaults": {
       "model": "claude-sonnet-4-6",
-      "workspace": "~/.openclaw/agents/main"
+      "workspace": "~/.muxtrail/agents/main"
     },
     "list": [
       {

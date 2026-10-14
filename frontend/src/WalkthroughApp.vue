@@ -6,7 +6,7 @@
       <div class="brand">
         <span class="brand-mark"></span>
         <div>
-          <p class="eyebrow">OPENCLAW FEISHU BOT WALKTHROUGH</p>
+          <p class="eyebrow">MUXTRAIL FEISHU BOT WALKTHROUGH</p>
           <h1>从一条飞书消息读完整条代码链路</h1>
         </div>
       </div>
@@ -230,36 +230,36 @@ const modules: WalkModule[] = [
     phase: '启动',
     title: 'main.py 注册命令入口',
     short: 'main.py',
-    file: 'backend/src/openclaw/cli/main.py',
+    file: 'backend/src/muxtrail/cli/main.py',
     fileShort: 'cli/main.py',
     symbol: 'app.add_typer(...)',
     studentGoal: '你先确认一件事：程序入口只是把命令菜单搭起来，飞书消息还没有出现。',
     role: '它是整套命令行的目录页',
     story:
-      '读 main.py 时不要急着找业务逻辑。这里像一个总目录，告诉 Typer：openclaw 下面有 gateway、sessions、models 等命令。我们今天执行的是 gateway run，所以它的作用是把我们带到 gateway 这条分支。',
+      '读 main.py 时不要急着找业务逻辑。这里像一个总目录，告诉 Typer：muxtrail 下面有 gateway、sessions、models 等命令。我们今天执行的是 gateway run，所以它的作用是把我们带到 gateway 这条分支。',
     exampleMoment:
       '“帮我创建文档”这句话此刻还不存在。当前只有一个人类在终端输入启动命令，系统还没有连上飞书。',
-    receivesFromPrevious: '来自终端的顶层命令，比如 python -m openclaw gateway run。',
+    receivesFromPrevious: '来自终端的顶层命令，比如 python -m muxtrail gateway run。',
     internalSteps: [
-      '创建 Typer 顶层应用，确定 CLI 名字叫 openclaw。',
+      '创建 Typer 顶层应用，确定 CLI 名字叫 muxtrail。',
       '把 gateway_app 注册到 gateway 子命令下面。',
       '把 sessions、models 等旁支命令也注册进去。',
       '当用户选择 gateway run 时，Typer 会把控制权交给 cli/gateway.py。',
     ],
     passesToNext: '把 gateway run 这条命令路由到 cli/gateway.py 的 run 函数。',
-    input: '终端命令，例如 python -m openclaw gateway run。',
+    input: '终端命令，例如 python -m muxtrail gateway run。',
     process: '创建 Typer app，并注册 gateway、sessions、models 等子命令。',
     output: 'gateway run 命令被挂到 CLI 上，下一步进入 cli/gateway.py。',
     dataTitle: '命令行入口',
     dataKind: 'CLI command',
-    dataShape: `python -m openclaw gateway run
+    dataShape: `python -m muxtrail gateway run
 
 含义：
-- openclaw：顶层 CLI
+- muxtrail：顶层 CLI
 - gateway：子命令组
 - run：启动 Gateway 服务`,
     codeIntro: '这段代码只做命令注册。看它时重点问：gateway 这个子命令是在哪里挂进去的。',
-    code: `app = typer.Typer(name="openclaw")  # 创建顶层 CLI，后面所有子命令都挂在它下面
+    code: `app = typer.Typer(name="muxtrail")  # 创建顶层 CLI，后面所有子命令都挂在它下面
 app.add_typer(gateway_app, name="gateway")  # 把 gateway 命令组挂进去，今天的启动链路从这里分叉
 app.add_typer(sessions_app, name="sessions")  # session 管理命令，和本节主线无关
 app.add_typer(models_app, name="models")  # 模型查看命令，和本节主线无关`,
@@ -273,7 +273,7 @@ app.add_typer(models_app, name="models")  # 模型查看命令，和本节主线
     phase: '启动',
     title: 'gateway.py 把命令转成服务启动',
     short: 'gateway.py',
-    file: 'backend/src/openclaw/cli/gateway.py',
+    file: 'backend/src/muxtrail/cli/gateway.py',
     fileShort: 'cli/gateway.py',
     symbol: '@gateway_app.command("run")',
     studentGoal: '你要看到命令行参数如何变成一个可运行的 GatewayServer。',
@@ -285,11 +285,11 @@ app.add_typer(models_app, name="models")  # 模型查看命令，和本节主线
     receivesFromPrevious: 'Typer 解析后的 run 命令，以及 host、port、config_path、log_level 等启动参数。',
     internalSteps: [
       '读取 gateway 相关环境变量，确保飞书和模型 key 能被后续代码看到。',
-      '加载 openclaw 配置文件，得到通道、模型、工具等配置。',
+      '加载 muxtrail 配置文件，得到通道、模型、工具等配置。',
       '用配置创建 GatewayServer。',
       '调用 server.run，让 uvicorn 开始运行 Web 服务。',
     ],
-    passesToNext: '把已经加载好的 OpenClawConfig 交给 GatewayServer。',
+    passesToNext: '把已经加载好的 MuxTrailConfig 交给 GatewayServer。',
     input: 'host、port、config_path、log_level 等命令行参数。',
     process: '加载 .env 和配置，创建 GatewayServer，然后调用 run。',
     output: '进入 gateway/server.py，准备创建 FastAPI app。',
@@ -298,7 +298,7 @@ app.add_typer(models_app, name="models")  # 模型查看命令，和本节主线
     dataShape: `{
   "host": "127.0.0.1",
   "port": 18789,
-  "config_path": "openclaw.feishu.json",
+  "config_path": "muxtrail.feishu.json",
   "env": {
     "FEISHU_APP_ID": "...",
     "DASHSCOPE_API_KEY": "..."
@@ -306,12 +306,12 @@ app.add_typer(models_app, name="models")  # 模型查看命令，和本节主线
 }`,
     codeIntro: '这段代码把“命令行参数”和“项目配置”合在一起，然后把服务对象创建出来。',
     code: `load_gateway_env()  # 先读 .env，飞书和模型配置之后都依赖这些环境变量
-config = load_config(path=config_path)  # 再读 OpenClaw 配置，确定启用哪些通道和工具
+config = load_config(path=config_path)  # 再读 MuxTrail 配置，确定启用哪些通道和工具
 server = GatewayServer(config=config)  # 创建 GatewayServer，它负责包装 FastAPI 和 uvicorn
 server.run(host=host, port=port)  # 开始监听端口，服务进入常驻运行状态`,
     takeaway: 'gateway.py 是启动胶水层，负责把 CLI 参数、环境变量和服务对象接起来。',
     commonMistake: '不要把 GatewayServer 当成 agent。它只是服务外壳，真正的模型执行还在后面的 runtime。',
-    objectFlow: ['gateway run', '环境变量', 'OpenClawConfig', 'GatewayServer'],
+    objectFlow: ['gateway run', '环境变量', 'MuxTrailConfig', 'GatewayServer'],
     questions: ['为什么这里要加载 .env？', 'GatewayServer 是业务处理器还是服务包装器？'],
   },
   {
@@ -319,16 +319,16 @@ server.run(host=host, port=port)  # 开始监听端口，服务进入常驻运�
     phase: '启动',
     title: 'server.py 创建 FastAPI App',
     short: 'server.py',
-    file: 'backend/src/openclaw/gateway/server.py',
+    file: 'backend/src/muxtrail/gateway/server.py',
     fileShort: 'gateway/server.py',
     symbol: 'GatewayServer.__init__',
     studentGoal: '你要把 server.py 理解成 Web 服务外壳，而不是业务主线。',
-    role: '它负责把 OpenClaw 放进 FastAPI 和 uvicorn 里运行',
+    role: '它负责把 MuxTrail 放进 FastAPI 和 uvicorn 里运行',
     story:
       'GatewayServer 做的事情很朴素：拿到配置，确认端口，创建 FastAPI app，再交给 uvicorn。它像是把已经准备好的系统装进一个 Web 服务容器里，让外部可以通过 HTTP、WebSocket 或飞书长连接触达系统。',
     exampleMoment:
       '飞书请求还没有进来。当前只是把服务端口打开，等后续飞书长连接或前端 WebSocket 连上来。',
-    receivesFromPrevious: 'cli/gateway.py 创建出的 OpenClawConfig 和启动端口。',
+    receivesFromPrevious: 'cli/gateway.py 创建出的 MuxTrailConfig 和启动端口。',
     internalSteps: [
       '保存配置对象，避免每个地方重新读配置。',
       '校验 Gateway 应该监听哪个端口。',
@@ -336,23 +336,23 @@ server.run(host=host, port=port)  # 开始监听端口，服务进入常驻运�
       '用 uvicorn.run 把 app 挂到 host 和 port 上。',
     ],
     passesToNext: '把 config 和 boot=True 交给 gateway/app.py 的 create_app。',
-    input: '已经加载好的 OpenClawConfig。',
+    input: '已经加载好的 MuxTrailConfig。',
     process: '校验端口，调用 create_app(config, boot=True)。',
     output: '得到可以被 uvicorn 运行的 FastAPI app。',
     dataTitle: '服务对象',
     dataKind: 'GatewayServer',
     dataShape: `GatewayServer
-  config: OpenClawConfig
+  config: MuxTrailConfig
   port: 18789
   app: FastAPI(create_app(...))`,
     codeIntro: '这段代码要看的重点是 create_app。FastAPI app 是在那里创建的，boot=True 表示要启动完整 runtime。',
     code: `self.config = config or load_config()  # 保存配置；如果外面没传，就自己加载默认配置
 self.port = validate_gateway_port(self.config)  # 从配置中确认 Gateway 端口
-self.app = create_app(self.config, boot=True)  # 创建 FastAPI app，同时要求启动 OpenClaw runtime
+self.app = create_app(self.config, boot=True)  # 创建 FastAPI app，同时要求启动 MuxTrail runtime
 uvicorn.run(self.app, host=host, port=actual_port)  # 交给 uvicorn 常驻运行`,
     takeaway: 'server.py 的职责是运行 Web 服务，不负责解释飞书消息。',
     commonMistake: '看到 server.py 很容易以为它是业务入口。实际上它只是把 app 跑起来，业务初始化在 app.py 的 lifespan 里。',
-    objectFlow: ['OpenClawConfig', 'GatewayServer', 'FastAPI app', 'uvicorn'],
+    objectFlow: ['MuxTrailConfig', 'GatewayServer', 'FastAPI app', 'uvicorn'],
     questions: ['create_app 在哪个文件？', 'boot=True 会影响后续哪一步？'],
   },
   {
@@ -360,13 +360,13 @@ uvicorn.run(self.app, host=host, port=actual_port)  # 交给 uvicorn 常驻运�
     phase: '启动',
     title: 'app.py 在生命周期里创建 GatewayRuntime',
     short: 'app.py',
-    file: 'backend/src/openclaw/gateway/app.py',
+    file: 'backend/src/muxtrail/gateway/app.py',
     fileShort: 'gateway/app.py',
     symbol: 'create_app(...).lifespan',
-    studentGoal: '你要看到 FastAPI 外壳和 OpenClaw 系统中枢是怎么接起来的。',
-    role: '它是 Web 框架和 OpenClaw runtime 的连接点',
+    studentGoal: '你要看到 FastAPI 外壳和 MuxTrail 系统中枢是怎么接起来的。',
+    role: '它是 Web 框架和 MuxTrail runtime 的连接点',
     story:
-      'FastAPI 有自己的生命周期，服务启动时会进入 lifespan。OpenClaw 就借这个时机创建 GatewayRuntime。GatewayRuntime 是后面所有能力的中枢：模型、工具、通道、session、runtime event 都从这里统一调度。',
+      'FastAPI 有自己的生命周期，服务启动时会进入 lifespan。MuxTrail 就借这个时机创建 GatewayRuntime。GatewayRuntime 是后面所有能力的中枢：模型、工具、通道、session、runtime event 都从这里统一调度。',
     exampleMoment:
       '这一步还没有用户消息，但会把前端 runtime 事件客户端挂进来。以后飞书消息、工具调用、模型输出都会通过这些事件展示到工作台。',
     receivesFromPrevious: 'server.py 传来的 config，以及 FastAPI 启动生命周期。',
@@ -392,7 +392,7 @@ uvicorn.run(self.app, host=host, port=actual_port)  # 交给 uvicorn 常驻运�
 gateway_runtime.attach_event_clients(state.connected_clients)  # 让 runtime 事件可以推给前端页面
 gateway_runtime.boot()  # 装配模型、工具、runtime、通道，此时还没有处理用户消息
 await gateway_runtime.start_channels()  # 启动飞书等通道，让它们开始等待外部事件`,
-    takeaway: 'app.py 把 FastAPI 的启动生命周期变成 OpenClaw 的系统启动流程。',
+    takeaway: 'app.py 把 FastAPI 的启动生命周期变成 MuxTrail 的系统启动流程。',
     commonMistake: 'boot 后不是进入 WebSocket。WebSocket 是前端观察运行过程的一条连接；飞书消息走的是飞书通道。',
     objectFlow: ['FastAPI lifespan', 'GatewayRuntime', 'event clients', 'channels'],
     questions: ['GatewayRuntime 是什么时候创建的？', 'start_channels 属于启动阶段还是消息阶段？'],
@@ -402,7 +402,7 @@ await gateway_runtime.start_channels()  # 启动飞书等通道，让它们开�
     phase: '启动',
     title: 'boot.py 装配模型、工具、通道',
     short: 'boot.py',
-    file: 'backend/src/openclaw/gateway/boot.py',
+    file: 'backend/src/muxtrail/gateway/boot.py',
     fileShort: 'gateway/boot.py',
     symbol: 'GatewayRuntime.boot',
     studentGoal: '你要理解 boot 是“装能力”，不是处理某条消息。',
@@ -446,7 +446,7 @@ self._register_tools()  # 注册工具能力，例如搜索、抓网页、创建
     phase: '飞书进线',
     title: 'start_channels 启动飞书长连接',
     short: 'start_channels',
-    file: 'backend/src/openclaw/gateway/boot.py',
+    file: 'backend/src/muxtrail/gateway/boot.py',
     fileShort: 'gateway/boot.py',
     symbol: 'GatewayRuntime.start_channels',
     studentGoal: '你要明白飞书通道是提前启动并长期等待消息的。',
@@ -488,11 +488,11 @@ self._register_tools()  # 注册工具能力，例如搜索、抓网页、创建
     phase: '飞书进线',
     title: '飞书用户发来创建文档请求',
     short: 'Feishu event',
-    file: 'backend/src/openclaw/channels/feishu/plugin.py',
+    file: 'backend/src/muxtrail/channels/feishu/plugin.py',
     fileShort: 'channels/feishu/plugin.py',
     symbol: 'FeishuChannelPlugin.handle_event',
     studentGoal: '你要看到外部飞书事件如何进入系统，但还没有进入模型。',
-    role: '它是飞书世界和 OpenClaw 世界之间的第一道适配层',
+    role: '它是飞书世界和 MuxTrail 世界之间的第一道适配层',
     story:
       '飞书推来的事件结构很复杂，里面有 sender、chat_id、message_id、content 等字段。Feishu 插件先做适配和过滤：是不是文本消息，是不是重复消息，是不是机器人自己发的消息，群聊里有没有 @ 当前机器人。通过这些检查后，才交给 Gateway。',
     exampleMoment:
@@ -535,11 +535,11 @@ await self._on_inbound(msg)  # 交给 GatewayRuntime._handle_inbound，进入统
     phase: '飞书进线',
     title: 'message.py 生成 InboundMessage',
     short: 'InboundMessage',
-    file: 'backend/src/openclaw/channels/feishu/message.py',
+    file: 'backend/src/muxtrail/channels/feishu/message.py',
     fileShort: 'channels/feishu/message.py',
     symbol: 'parse_inbound',
     studentGoal: '你要理解统一消息格式的价值：后面的主线不用认识飞书原始字段。',
-    role: '它把飞书方言翻译成 OpenClaw 普通话',
+    role: '它把飞书方言翻译成 MuxTrail 普通话',
     story:
       '不同平台的消息结构都不一样。飞书有自己的 sender、chat_id、message_id、content 格式，WebChat 或别的通道又不同。parse_inbound 的任务就是把这些差异压平，统一成 channel、senderId、conversationId、text 这些字段。',
     exampleMoment:
@@ -555,7 +555,7 @@ await self._on_inbound(msg)  # 交给 GatewayRuntime._handle_inbound，进入统
     passesToNext: '产出统一 InboundMessage，交给 GatewayRuntime._handle_inbound。',
     input: '飞书 event_data。',
     process: '读取 sender_id、chat_id、message_id、text，并移除 @ 标签。',
-    output: 'OpenClaw 内部统一的 InboundMessage。',
+    output: 'MuxTrail 内部统一的 InboundMessage。',
     dataTitle: '标准化后的消息',
     dataKind: 'InboundMessage',
     dataShape: `InboundMessage(
@@ -583,7 +583,7 @@ return InboundMessage(channel="feishu", senderId=str(sender_id or ""), conversat
     phase: '飞书进线',
     title: '_handle_inbound 进入 Gateway 统一入口',
     short: '_handle_inbound',
-    file: 'backend/src/openclaw/gateway/boot.py',
+    file: 'backend/src/muxtrail/gateway/boot.py',
     fileShort: 'gateway/boot.py',
     symbol: 'GatewayRuntime._handle_inbound',
     studentGoal: '你要看到飞书、WebChat 等入口最终都会汇合到 GatewayRuntime。',
@@ -630,7 +630,7 @@ result = await self.run_agent_for_session(  # 进入统一 agent 执行函数
     phase: 'Agent 执行',
     title: 'run_agent_for_session 读取历史并组装任务',
     short: 'run_agent_for_session',
-    file: 'backend/src/openclaw/gateway/boot.py',
+    file: 'backend/src/muxtrail/gateway/boot.py',
     fileShort: 'gateway/boot.py',
     symbol: 'GatewayRuntime.run_agent_for_session',
     studentGoal: '你要看懂模型执行前的准备：历史、system prompt、工具说明、工具策略。',
@@ -681,7 +681,7 @@ request = AgentRunRequest(run_id=run_id, session_key=session_key, provider_id=se
     phase: 'Agent 执行',
     title: 'runner.py 调模型并识别工具调用',
     short: 'runner.py',
-    file: 'backend/src/openclaw/agents/runtime/embedded/runner.py',
+    file: 'backend/src/muxtrail/agents/runtime/embedded/runner.py',
     fileShort: 'runtime/embedded/runner.py',
     symbol: 'EmbeddedRuntime._single_attempt',
     studentGoal: '你要看懂模型并不是直接创建文档，而是先判断要不要调用工具。',
@@ -728,7 +728,7 @@ async for chunk in provider.create_stream(model=request.model_id, messages=messa
     phase: '工具调用',
     title: 'tool_loop.py 执行搜索和飞书文档工具',
     short: 'tool_loop.py',
-    file: 'backend/src/openclaw/agents/runtime/embedded/tool_loop.py',
+    file: 'backend/src/muxtrail/agents/runtime/embedded/tool_loop.py',
     fileShort: 'runtime/embedded/tool_loop.py',
     symbol: 'run_tool_loop',
     studentGoal: '你要理解模型负责提出意图，系统负责检查权限并执行工具。',
@@ -779,7 +779,7 @@ tool_results.append({"role": "tool", "tool_call_id": tool_id, "name": tool_name,
     phase: '工具调用',
     title: 'feishu_docs_create_with_content 创建文档',
     short: 'feishu_docs',
-    file: 'backend/src/openclaw/tools/builtin/feishu_docs.py',
+    file: 'backend/src/muxtrail/tools/builtin/feishu_docs.py',
     fileShort: 'tools/builtin/feishu_docs.py',
     symbol: 'feishu_docs_create_with_content',
     studentGoal: '你要确认创建飞书文档是一个工具，不是写死在 prompt 或 if 判断里的特殊逻辑。',
@@ -823,7 +823,7 @@ return json.dumps({"document_id": document_id, "url": url, "reply_text": reply_t
     phase: '回复',
     title: 'Gateway 写 assistant transcript 并回复飞书',
     short: 'reply',
-    file: 'backend/src/openclaw/gateway/boot.py',
+    file: 'backend/src/muxtrail/gateway/boot.py',
     fileShort: 'gateway/boot.py',
     symbol: 'runtime.run completed + channel.send',
     studentGoal: '你要看到系统如何从 runtime 结果回到飞书用户。',

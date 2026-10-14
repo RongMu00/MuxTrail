@@ -33,14 +33,14 @@ def _sign(secret: str, body: bytes) -> str:
 class TestFeishuInternalEndpoint:
     @pytest.mark.asyncio
     async def test_rejects_bad_signature(self, app, client, monkeypatch) -> None:
-        monkeypatch.setenv("OPENCLAW_FEISHU_INTERNAL_SECRET", "test-secret")
+        monkeypatch.setenv("MUXTRAIL_FEISHU_INTERNAL_SECRET", "test-secret")
         app.state.gateway_runtime = FakeRuntime()
         body = b'{"accountId":"default"}'
 
         resp = await client.post(
             "/internal/channels/feishu/events",
             content=body,
-            headers={"x-openclaw-signature": "bad"},
+            headers={"x-muxtrail-signature": "bad"},
         )
 
         assert resp.status_code == 401
@@ -48,7 +48,7 @@ class TestFeishuInternalEndpoint:
     @pytest.mark.asyncio
     async def test_accepts_signed_event(self, app, client, monkeypatch) -> None:
         secret = "test-secret"
-        monkeypatch.setenv("OPENCLAW_FEISHU_INTERNAL_SECRET", secret)
+        monkeypatch.setenv("MUXTRAIL_FEISHU_INTERNAL_SECRET", secret)
         runtime = FakeRuntime()
         app.state.gateway_runtime = runtime
         payload = {
@@ -61,7 +61,7 @@ class TestFeishuInternalEndpoint:
         resp = await client.post(
             "/internal/channels/feishu/events",
             content=body,
-            headers={"x-openclaw-signature": f"sha256={_sign(secret, body)}"},
+            headers={"x-muxtrail-signature": f"sha256={_sign(secret, body)}"},
         )
 
         assert resp.status_code == 200

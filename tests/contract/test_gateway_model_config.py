@@ -9,16 +9,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from openclaw.contracts.config.types_agents import AgentDefaults, AgentsConfig
-from openclaw.contracts.config.types_openclaw import OpenClawConfig
-from openclaw.gateway.boot import GatewayRuntime
+from muxtrail.contracts.config.types_agents import AgentDefaults, AgentsConfig
+from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
+from muxtrail.gateway.boot import GatewayRuntime
 
 if TYPE_CHECKING:
     import pytest
 
 
 def _runtime_with_model(model: str) -> GatewayRuntime:
-    config = OpenClawConfig(agents=AgentsConfig(defaults=AgentDefaults(model=model)))
+    config = MuxTrailConfig(agents=AgentsConfig(defaults=AgentDefaults(model=model)))
     return GatewayRuntime(config)
 
 

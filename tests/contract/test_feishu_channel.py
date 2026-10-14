@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from openclaw.channels.feishu.auth import FeishuAuth
-from openclaw.channels.feishu.events import (
+from muxtrail.channels.feishu.auth import FeishuAuth
+from muxtrail.channels.feishu.events import (
     FEISHU_WS_ENDPOINT_URL,
     FRAME_TYPE_DATA,
     HEADER_MESSAGE_ID,
@@ -24,8 +24,8 @@ from openclaw.channels.feishu.events import (
     _decode_frame,
     _encode_frame,
 )
-from openclaw.channels.feishu.message import parse_inbound
-from openclaw.channels.feishu.plugin import FeishuChannelPlugin
+from muxtrail.channels.feishu.message import parse_inbound
+from muxtrail.channels.feishu.plugin import FeishuChannelPlugin
 
 
 def test_parse_sidecar_text_event() -> None:

@@ -76,6 +76,26 @@ async def handle_sessions_send(
         on_text_delta=on_text_delta,
     )
 
+    response_text = result.preferred_response or "".join(result.texts)
+    if not response_text:
+        response_text = result.error or "The model returned an empty response."
+    await runtime._emit_runtime_event(
+        "runtime.channel.reply_sent",
+        layer="reply",
+        session_key=session_key,
+        run_id=result.run_id,
+        status="done",
+        title="Reply delivered to WebChat",
+        detail=response_text[:300],
+        data={
+            "channel": "webchat",
+            "conversationId": session_key,
+            "traceId": result.run_id,
+            "delivery": {"ok": True, "transport": "gateway-websocket"},
+            "text": response_text,
+        },
+    )
+
     await client.send_json(
         make_event(
             "agent.event",
@@ -87,10 +107,11 @@ async def handle_sessions_send(
     )
 
     return {
-        "ok": True,
+        "ok": result.error is None,
         "sessionKey": session_key,
         "inputTokens": result.input_tokens,
         "outputTokens": result.output_tokens,
+        "error": result.error,
     }
 
 

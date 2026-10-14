@@ -75,3 +75,50 @@ async def test_tavily_zero_results_is_not_negative_evidence(
     assert result["ok"] is True
     assert result["results"] == []
     assert "not evidence" in result["warning"]
+
+
+@pytest.mark.asyncio
+async def test_tavily_reranks_official_release_above_old_discussion(
+    httpx_mock: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    monkeypatch.delenv("BOCHA_API_KEY", raising=False)
+    httpx_mock.add_response(
+        method="POST",
+        url=TAVILY_SEARCH_URL,
+        json={
+            "request_id": "req-authority",
+            "results": [
+                {
+                    "title": "Python latest stable version?",
+                    "url": "https://discuss.python.org/t/python-latest-stable-version/24563",
+                    "content": "An old discussion mentioning Python 3.11.2.",
+                    "score": 0.99,
+                },
+                {
+                    "title": "Python 3.15.0",
+                    "url": "https://www.python.org/downloads/release/python-3150/",
+                    "content": "This is the stable release of Python 3.15.0.",
+                    "score": 0.75,
+                },
+            ],
+        },
+    )
+    tool = create_web_search_tool()
+    assert tool.handler is not None
+
+    result = await tool.handler(
+        {
+            "query": "latest stable Python release",
+            "include": ["python.org"],
+            "count": 5,
+        },
+        None,
+    )
+
+    assert result["results"][0]["url"].endswith("/downloads/release/python-3150/")
+    assert result["results"][0]["source_kind"] == "official-release"
+    assert result["results"][0]["rank"] == 1
+    assert result["results"][1]["source_kind"] == "discussion"
+    assert result["provider_metadata"]["ranking_policy"] == "authority-aware-v1"
+    assert "Do not use a discussion thread" in result["research_guidance"]

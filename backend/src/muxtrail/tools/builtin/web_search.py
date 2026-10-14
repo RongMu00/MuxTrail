@@ -34,6 +34,10 @@ WEB_SEARCH_PROMPT_INSTRUCTIONS = (
     "not provide official or primary material, say that clearly in the generated content. If "
     "the tool returns an error or no results, state that search failed or found no usable "
     "results; do not infer that an event did not happen and do not guess factual conclusions. "
+    "For latest, current, stable-release, or other time-sensitive claims, prefer official "
+    "release, download, status, or announcement pages over forums and discussion threads. "
+    "Open an authoritative result, compare its date/status, and never treat an old discussion "
+    "as evidence of the current state. "
     "Do not call web_search for simple stable facts or purely local tasks."
 )
 
@@ -87,6 +91,65 @@ def _filter_results(
             continue
         filtered.append(result)
     return filtered
+
+
+def _is_time_sensitive_release_query(query: str) -> bool:
+    """Return whether a query asks for the current release or version of something."""
+    return bool(
+        re.search(r"\b(latest|current|newest|stable|release|version)\b", query, re.I)
+        and re.search(r"\b(latest|current|newest|stable)\b", query, re.I)
+    )
+
+
+def _source_kind(url: str, query: str) -> tuple[str, int]:
+    """Classify sources for transparent, deterministic authority-aware ranking."""
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower()
+    path = parsed.path.lower().rstrip("/") or "/"
+    is_discussion = (
+        hostname.startswith(("discuss.", "forum.", "forums."))
+        or "/discuss/" in f"{path}/"
+        or "/discussion/" in f"{path}/"
+        or "/forum/" in f"{path}/"
+        or "/forums/" in f"{path}/"
+        or "/t/" in f"{path}/"
+    )
+    if is_discussion:
+        return "discussion", -100
+    if not _is_time_sensitive_release_query(query):
+        return "web", 0
+    if "/downloads/release/" in f"{path}/" or "/releases/" in f"{path}/":
+        return "official-release", 100
+    if path in {"/downloads", "/download", "/releases", "/release"}:
+        return "official-release-index", 90
+    if hostname.startswith("blog.") and "release" in path:
+        return "official-announcement", 70
+    if "release" in path or "download" in path:
+        return "release-page", 50
+    return "web", 0
+
+
+def _rank_results(
+    results: list[dict[str, Any]], query: str
+) -> list[dict[str, Any]]:
+    """Add ranking evidence and prefer authoritative sources for current-release queries."""
+    enriched: list[tuple[int, float, int, dict[str, Any]]] = []
+    for original_index, result in enumerate(results):
+        item = dict(result)
+        source_kind, authority_score = _source_kind(str(item.get("url", "")), query)
+        item["source_kind"] = source_kind
+        item["authority_score"] = authority_score
+        try:
+            provider_score = float(item.get("score") or 0)
+        except (TypeError, ValueError):
+            provider_score = 0.0
+        enriched.append((authority_score, provider_score, -original_index, item))
+    enriched.sort(key=lambda row: (row[0], row[1], row[2]), reverse=True)
+    ranked: list[dict[str, Any]] = []
+    for rank, (_, _, _, item) in enumerate(enriched, start=1):
+        item["rank"] = rank
+        ranked.append(item)
+    return ranked
 
 
 def _extract_version_anchor(query: str) -> str:
@@ -238,7 +301,7 @@ async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]
                             "rank": rank,
                         }
                     )
-                results = _filter_results(results, include, exclude)
+                results = _rank_results(_filter_results(results, include, exclude), query)
                 result: dict[str, Any] = {
                     "ok": True,
                     "provider": "tavily",
@@ -251,8 +314,18 @@ async def _tavily_search(params: dict[str, Any], api_key: str) -> dict[str, Any]
                     "result_count": len(results[:count]),
                     "duration_ms": int((time.monotonic() - started) * 1000),
                     "retry_count": retry_count,
-                    "provider_metadata": {"request_id": payload.get("request_id")},
+                    "provider_metadata": {
+                        "request_id": payload.get("request_id"),
+                        "ranking_policy": "authority-aware-v1",
+                    },
                 }
+                if _is_time_sensitive_release_query(query):
+                    result["research_guidance"] = (
+                        "Verify the current claim from a result marked official-release, "
+                        "official-release-index, or official-announcement. Open that page and "
+                        "check its date and status. Do not use a discussion thread as evidence "
+                        "of the latest version."
+                    )
                 if not results:
                     result["warning"] = (
                         "Tavily returned zero usable results. This is not evidence that the "

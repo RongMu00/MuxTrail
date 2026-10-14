@@ -5,9 +5,14 @@
 
 """Integration test: WebChat uses Gateway EventFrame push, not channel.send()."""
 
+from types import SimpleNamespace
+from typing import Any
+
 import pytest
 from muxtrail.channels.webchat.plugin import WebChatPlugin
 from muxtrail.contracts.channel.plugin import OutboundMessage
+from muxtrail.gateway.boot import AgentRunResult
+from muxtrail.gateway.methods.sessions import handle_sessions_send
 
 
 class TestWebChatDesign:
@@ -37,3 +42,39 @@ class TestWebChatDesign:
     def test_webchat_accounts(self) -> None:
         plugin = WebChatPlugin()
         assert plugin.list_account_ids({}) == ["default"]
+
+
+@pytest.mark.asyncio
+async def test_webchat_send_emits_reply_delivery_event() -> None:
+    emitted: list[dict[str, Any]] = []
+    frames: list[dict[str, Any]] = []
+
+    class Runtime:
+        async def run_agent_for_session(self, **kwargs: Any) -> AgentRunResult:
+            result = AgentRunResult()
+            result.run_id = "trace-webchat"
+            result.texts = ["MuxTrail reply"]
+            return result
+
+        async def _emit_runtime_event(self, event_type: str, **kwargs: Any) -> None:
+            emitted.append({"type": event_type, **kwargs})
+
+    class Client:
+        async def send_json(self, frame: dict[str, Any]) -> None:
+            frames.append(frame)
+
+    state = SimpleNamespace(_gateway_runtime_ref=Runtime())
+    response = await handle_sessions_send(
+        {"sessionKey": "web:test", "message": "hello"}, Client(), state
+    )
+
+    assert response["ok"] is True
+    reply = next(item for item in emitted if item["type"] == "runtime.channel.reply_sent")
+    assert reply["layer"] == "reply"
+    assert reply["status"] == "done"
+    assert reply["run_id"] == "trace-webchat"
+    assert reply["data"]["delivery"] == {
+        "ok": True,
+        "transport": "gateway-websocket",
+    }
+    assert frames[-1]["payload"]["type"] == "complete"

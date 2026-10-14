@@ -434,6 +434,7 @@ class GatewayRuntime:
                 layer="channel",
                 session_key=session_key,
                 run_id=run_id,
+                status="done",
                 title="Inbound message",
                 detail=user_message,
                 data={
@@ -468,8 +469,9 @@ class GatewayRuntime:
             layer="session",
             session_key=session_key,
             run_id=run_id,
+            status="done",
             title="Session loaded",
-            detail=f"{len(history)} 条历史消息",
+            detail=f"{len(history)} messages loaded from session history",
             data={
                 "sessionId": entry.session_id,
                 "historyCount": len(history),
@@ -820,6 +822,8 @@ class GatewayRuntime:
             "runtime.channel.inbound",
             layer="channel",
             session_key=session_key,
+            run_id=trace_id,
+            status="done",
             title="Inbound message",
             detail=message.text or "",
             data={

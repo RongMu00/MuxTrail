@@ -64,7 +64,7 @@ class TestConfigLoad:
         assert config.gateway.port == 19001
 
     def test_load_config_uses_home_default_path(self, tmp_path: Path) -> None:
-        state_dir = tmp_path / ".muxtrail"
+        state_dir = tmp_path / ".muxtrail-state"
         state_dir.mkdir()
         (state_dir / "muxtrail.json").write_text(
             '{"channels": {"feishu": {"enabled": true}}}\n',

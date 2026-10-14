@@ -9,12 +9,14 @@ from muxtrail.contracts.channel.plugin import (
     ChannelCapabilities,
     ChannelMeta,
     ChannelPlugin,
+    DeliveryResult,
     InboundMessage,
     OutboundMessage,
 )
 
 __all__ = [
     "ChannelPlugin",
+    "DeliveryResult",
     "ChannelMeta",
     "ChannelCapabilities",
     "InboundMessage",

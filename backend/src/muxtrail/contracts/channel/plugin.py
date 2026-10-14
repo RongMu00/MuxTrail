@@ -51,12 +51,20 @@ class InboundMessage(BaseModel):
 
     channel: str
     account_id: str = Field(alias="accountId")
+    workspace_id: str | None = Field(default=None, alias="workspaceId")
     sender_id: str = Field(alias="senderId")
     conversation_id: str = Field(alias="conversationId")
     text: str | None = None
     attachments: list[dict[str, Any]] | None = None
     thread_id: str | None = Field(default=None, alias="threadId")
+    message_id: str | None = Field(default=None, alias="messageId")
+    reply_target: str | None = Field(default=None, alias="replyTarget")
+    trace_id: str | None = Field(default=None, alias="traceId")
     chat_type: str = Field(default="dm", alias="chatType")
+    unsupported_content: list[dict[str, Any]] | None = Field(
+        default=None, alias="unsupportedContent"
+    )
+    capabilities: dict[str, Any] | None = None
     raw: dict[str, Any] | None = None
 
 
@@ -68,7 +76,22 @@ class OutboundMessage(BaseModel):
     text: str | None = None
     media_urls: list[str] | None = Field(default=None, alias="mediaUrls")
     reply_to_id: str | None = Field(default=None, alias="replyToId")
+    thread_id: str | None = Field(default=None, alias="threadId")
+    trace_id: str | None = Field(default=None, alias="traceId")
     channel_data: dict[str, Any] | None = Field(default=None, alias="channelData")
+
+
+class DeliveryResult(BaseModel):
+    """Normalized channel delivery outcome for tracing and diagnostics."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    ok: bool
+    channel: str
+    message_ids: list[str] = Field(default_factory=list, alias="messageIds")
+    status_code: int | None = Field(default=None, alias="statusCode")
+    error: str | None = None
+    retry_count: int = Field(default=0, alias="retryCount")
 
 
 @runtime_checkable

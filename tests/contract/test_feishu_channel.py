@@ -58,6 +58,7 @@ def test_parse_sidecar_text_event() -> None:
 def test_feishu_accounts_can_use_environment(monkeypatch) -> None:
     monkeypatch.setenv("FEISHU_APP_ID", "cli_test")
     monkeypatch.setenv("FEISHU_APP_SECRET", "secret")
+    monkeypatch.setenv("MUXTRAIL_FEISHU_ENABLED", "true")
 
     plugin = FeishuChannelPlugin()
 

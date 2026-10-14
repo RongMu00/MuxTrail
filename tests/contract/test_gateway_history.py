@@ -41,5 +41,5 @@ def test_search_failure_reply_rejects_factual_inference() -> None:
     reply = _search_failure_reply("no official matches")
 
     assert "no official matches" in reply
-    assert "不能据此判断" in reply
-    assert "版本尚未发布" in reply
+    assert "does not show" in reply
+    assert "does not exist" in reply

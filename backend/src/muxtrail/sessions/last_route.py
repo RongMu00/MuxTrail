@@ -19,8 +19,7 @@ def build_last_route_patch(message: InboundMessage) -> dict[str, Any]:
         "lastChannel": message.channel,
         "lastTo": message.conversation_id,
     }
-    if message.raw:
-        patch["lastAccountId"] = message.raw.get("account_id", "default")
+    patch["lastAccountId"] = message.account_id
     thread_id = getattr(message, "thread_id", None)
     if thread_id:
         patch["lastThreadId"] = thread_id

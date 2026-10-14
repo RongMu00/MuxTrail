@@ -6,6 +6,7 @@
 """Message routing — 9-tier priority resolution matching TS resolve-route.ts."""
 
 from typing import Any
+from urllib.parse import quote
 
 from muxtrail.contracts.channel.plugin import InboundMessage
 from muxtrail.core.logging import get_logger
@@ -73,7 +74,7 @@ def resolve_route(
     chat_type = message.chat_type
     thread_id = getattr(message, "thread_id", None)
     raw = message.raw or {}
-    account_id = raw.get("account_id", "default")
+    account_id = message.account_id or str(raw.get("account_id") or "default")
 
     if bindings:
         for rule in bindings.rules:
@@ -90,15 +91,21 @@ def resolve_route(
             if rule.get("channel") == channel and "account" not in rule and "peer" not in rule:
                 return _build_route(rule, channel, sender, conv, "binding.channel")
 
-    # Tier 9: default
-    if chat_type == "dm":
-        session_key = f"dm:{channel}:{sender}"
-    elif chat_type == "group":
-        session_key = f"group:{channel}:{conv}"
-    elif thread_id:
-        session_key = f"thread:{channel}:{thread_id}"
-    else:
-        session_key = f"{channel}:{sender}"
+    # Tier 9: stable, collision-resistant channel identity. Keep every external namespace
+    # dimension explicit so equal user/channel IDs from different workspaces never collide.
+    workspace = message.workspace_id or str(
+        raw.get("workspace_id") or raw.get("team_id") or raw.get("guild_id") or "local"
+    )
+    thread = thread_id or "root"
+
+    def encode(value: Any) -> str:
+        return quote(str(value or "unknown"), safe="")
+
+    session_key = (
+        f"channel:{encode(channel)}:account:{encode(account_id)}:workspace:{encode(workspace)}:"
+        f"conversation:{encode(conv)}:thread:{encode(thread)}:user:{encode(sender)}:"
+        f"type:{encode(chat_type)}"
+    )
 
     return ResolvedRoute(
         agent_id=default_agent,

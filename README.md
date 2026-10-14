@@ -1,5 +1,7 @@
 # MuxTrail
 
+[![CI](https://github.com/RongMu00/MuxTrail/actions/workflows/ci.yml/badge.svg)](https://github.com/RongMu00/MuxTrail/actions/workflows/ci.yml)
+
 > An observable, local-first AI gateway for running one tool-using assistant across WebChat,
 > Slack, Discord, and optional Feishu channels.
 

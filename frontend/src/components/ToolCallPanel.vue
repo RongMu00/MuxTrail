@@ -1,7 +1,7 @@
 <template>
   <section class="tools-panel">
     <div class="section-head">
-      <p class="eyebrow">工具</p>
+      <p class="eyebrow">Tools</p>
       <strong>{{ runtime.activeRun?.tools.length || 0 }}</strong>
     </div>
 
@@ -16,14 +16,14 @@
         </div>
         <div v-if="hasResult(tool.result)" class="result-block">
           <div class="result-top">
-            <span>工具结果</span>
+            <span>Tool result</span>
             <a
               v-if="extractUrl(tool.result)"
               :href="extractUrl(tool.result)"
               target="_blank"
               rel="noreferrer"
             >
-              打开链接
+              Open link
             </a>
           </div>
           <dl v-if="summaryRows(tool.result).length" class="result-summary">
@@ -35,13 +35,13 @@
           <pre>{{ formatResult(tool.result) }}</pre>
         </div>
         <details>
-          <summary>调用参数</summary>
+          <summary>Arguments</summary>
           <pre>{{ formatParams(tool.params) }}</pre>
         </details>
       </article>
     </div>
 
-    <div v-if="!runtime.activeRun?.tools.length" class="empty">暂无工具调用。</div>
+    <div v-if="!runtime.activeRun?.tools.length" class="empty">No tool calls yet.</div>
   </section>
 </template>
 
@@ -53,10 +53,10 @@ const runtime = useRuntimeStore()
 
 function statusLabel(status: RuntimeStatus) {
   const labels: Record<RuntimeStatus, string> = {
-    idle: '等待',
-    active: '执行中',
-    done: '完成',
-    failed: '失败',
+    idle: 'Waiting',
+    active: 'Running',
+    done: 'Complete',
+    failed: 'Failed',
   }
   return labels[status]
 }
@@ -101,19 +101,19 @@ function summaryRows(result: unknown) {
   const parsed = parseResult(result)
   if (!isRecord(parsed)) return []
   const labels: Record<string, string> = {
-    ok: '状态',
-    title: '标题',
-    document_id: '文档 ID',
-    url: '链接',
-    blocks_created: '写入块',
-    reply_text: '回复文本',
-    error: '错误',
+    ok: 'Status',
+    title: 'Title',
+    document_id: 'Document ID',
+    url: 'URL',
+    blocks_created: 'Blocks written',
+    reply_text: 'Reply text',
+    error: 'Error',
   }
   return Object.entries(labels)
     .filter(([key]) => parsed[key] !== undefined && parsed[key] !== null && parsed[key] !== '')
     .map(([key, label]) => ({
       label,
-      value: key === 'ok' ? (parsed[key] ? '成功' : '失败') : String(parsed[key]),
+      value: key === 'ok' ? (parsed[key] ? 'Success' : 'Failed') : String(parsed[key]),
     }))
 }
 </script>

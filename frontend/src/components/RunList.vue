@@ -2,10 +2,13 @@
   <aside class="run-list">
     <div class="panel-head">
       <div>
-        <p class="eyebrow">运行</p>
-        <h2>实时会话</h2>
+        <p class="eyebrow">Runs</p>
+        <h2>Live sessions</h2>
       </div>
-      <button class="ghost-btn" @click="runtime.loadSnapshot">刷新</button>
+      <div class="panel-actions">
+        <button class="ghost-btn" @click="runtime.loadSnapshot">Refresh</button>
+        <button class="ghost-btn" @click="runtime.resetActiveConversation">Reset</button>
+      </div>
     </div>
 
     <div class="meta-grid">
@@ -14,7 +17,7 @@
         <strong :class="['status-text', runtime.wsStatus]">{{ connectionLabel(runtime.wsStatus) }}</strong>
       </div>
       <div>
-        <span class="meta-label">通道</span>
+        <span class="meta-label">Channel</span>
         <strong>{{ runtime.channels.length }}</strong>
       </div>
     </div>
@@ -29,14 +32,14 @@
         <span :class="['dot', run.status]"></span>
         <span class="run-main">
           <span class="run-title">{{ run.title || run.sessionKey }}</span>
-          <span class="run-sub">{{ run.channel || 'WebChat' }} · {{ run.model || '等待中' }}</span>
+          <span class="run-sub">{{ run.channel || 'WebChat' }} · {{ run.model || 'Waiting' }}</span>
         </span>
         <span class="run-time">{{ formatTime(run.updatedAt) }}</span>
       </button>
     </div>
 
     <div v-if="!runtime.runs.length" class="empty">
-      正在等待运行时事件。
+      Waiting for runtime events.
     </div>
   </aside>
 </template>
@@ -48,10 +51,10 @@ const runtime = useRuntimeStore()
 
 function connectionLabel(status: string) {
   const labels: Record<string, string> = {
-    connected: '已连接',
-    handshake: '握手中',
-    disconnected: '未连接',
-    error: '异常',
+    connected: 'Connected',
+    handshake: 'Connecting',
+    disconnected: 'Disconnected',
+    error: 'Error',
   }
   return labels[status] || status
 }
@@ -100,6 +103,10 @@ h2 {
   color: var(--text);
   font: 600 11px/1 var(--mono);
   cursor: pointer;
+}
+.panel-actions {
+  display: flex;
+  gap: 6px;
 }
 .ghost-btn:hover {
   border-color: var(--accent);

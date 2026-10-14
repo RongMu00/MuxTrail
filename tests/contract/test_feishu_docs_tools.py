@@ -188,7 +188,10 @@ class TestFeishuDocsTools:
         assert result["document_id"] == "doc_1"
         assert result["blocks_created"] == 2
         assert result["url"] == "https://example.feishu.cn/docx/doc_1"
-        assert result["reply_text"] == "已创建飞书文档：《GRPO》\n链接：https://example.feishu.cn/docx/doc_1"
+        assert (
+            result["reply_text"]
+            == "已创建飞书文档：《GRPO》\n链接：https://example.feishu.cn/docx/doc_1"
+        )
 
     @pytest.mark.asyncio
     async def test_create_with_content_tool_adds_sender_as_collaborator(

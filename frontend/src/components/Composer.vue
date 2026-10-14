@@ -3,11 +3,12 @@
     <textarea
       v-model="runtime.draft"
       rows="3"
-      placeholder="通过本地 WebChat 发送一条消息，走 sessions.send"
+      aria-label="Message MuxTrail through local WebChat"
+      placeholder="Send a message through local WebChat"
     ></textarea>
     <div class="composer-actions">
       <span>{{ runtime.sendStatus || 'web:local' }}</span>
-      <button :disabled="!runtime.draft.trim()">发送</button>
+      <button :disabled="!runtime.draft.trim()">Send</button>
     </div>
   </form>
 </template>

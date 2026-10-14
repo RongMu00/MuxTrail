@@ -84,6 +84,63 @@ async def test_web_fetch_does_not_expose_error_page_body(httpx_mock: Any) -> Non
     assert result["error"] == "Fetch failed: HTTP 404"
 
 
+@pytest.mark.asyncio
+async def test_web_fetch_validates_and_reports_redirect_chain(httpx_mock: Any) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="https://example.com/start",
+        status_code=302,
+        headers={"location": "/final"},
+    )
+    httpx_mock.add_response(
+        method="GET",
+        url="https://example.com/final",
+        headers={"content-type": "text/plain; charset=utf-8"},
+        text="redirected safely",
+    )
+    tool = create_web_fetch_tool()
+    assert tool.handler is not None
+
+    result = await tool.handler({"url": "https://example.com/start"}, None)
+
+    assert result["ok"] is True
+    assert result["url"] == "https://example.com/start"
+    assert result["final_url"] == "https://example.com/final"
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_decodes_declared_charset(httpx_mock: Any) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="https://example.com/latin",
+        headers={"content-type": "text/plain; charset=iso-8859-1"},
+        content="café".encode("iso-8859-1"),
+    )
+    tool = create_web_fetch_tool()
+    assert tool.handler is not None
+
+    result = await tool.handler({"url": "https://example.com/latin"}, None)
+
+    assert result["text"] == "café"
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_rejects_unsafe_redirect(httpx_mock: Any) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="https://example.com/start",
+        status_code=302,
+        headers={"location": "http://127.0.0.1/private"},
+    )
+    tool = create_web_fetch_tool()
+    assert tool.handler is not None
+
+    result = await tool.handler({"url": "https://example.com/start"}, None)
+
+    assert result["ok"] is False
+    assert "private" in result["error"] or "loopback" in result["error"]
+
+
 def test_web_fetch_tool_exposes_research_prompt_instruction() -> None:
     tool = create_web_fetch_tool()
 

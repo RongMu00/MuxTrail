@@ -1,7 +1,7 @@
 <template>
   <aside class="inspector">
     <div class="summary">
-      <p class="eyebrow">检查器</p>
+      <p class="eyebrow">INSPECTOR</p>
       <h2>{{ statusLabel(runtime.activeRun?.status || 'idle') }}</h2>
       <div class="facts">
         <span>{{ runtime.activeRun?.provider || '-' }}</span>
@@ -11,10 +11,10 @@
 
     <div class="output">
       <div class="output-head">
-        <span>最终回复 / 可见输出</span>
+        <span>Final response / visible output</span>
         <strong>{{ runtime.activeRun?.output.length || 0 }}</strong>
       </div>
-      <pre>{{ runtime.activeRun?.output || '暂无模型输出。' }}</pre>
+      <pre>{{ runtime.activeRun?.output || 'No model output yet.' }}</pre>
     </div>
 
     <ToolCallPanel />
@@ -31,10 +31,10 @@ const runtime = useRuntimeStore()
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
-    idle: '空闲',
-    active: '运行中',
-    done: '已完成',
-    failed: '失败',
+    idle: 'Idle',
+    active: 'Running',
+    done: 'Complete',
+    failed: 'Failed',
   }
   return labels[status] || status
 }

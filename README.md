@@ -1,259 +1,132 @@
 # MuxTrail
 
-MuxTrail 是一个本地 AI Gateway。它把浏览器工作台、飞书机器人、模型供应商和工具调用接在一起，用来观察一条消息从入口到模型、工具、回复的完整执行链路。
+> An observable, local-first AI gateway for running one tool-using assistant across WebChat,
+> Slack, Discord, and optional Feishu channels.
 
-当前重点能力：
+MuxTrail is an English-first developer tool for inspecting the complete path of an agent turn:
 
-- 本地 Web 工作台，实时查看运行状态、模型输出、工具调用和消息上下文。
-- 飞书机器人私聊和群聊 `@机器人` 文本接入。
-- DashScope、OpenAI、Anthropic 模型接入。
-- Bocha 网络搜索和公开网页读取。
-- 飞书云文档读取、搜索、创建和写入正文。
+`channel event → gateway → session → model → tool calls → model result → channel reply`
 
-## 1. 环境要求
+It is designed for AI infrastructure, backend, developer-tools, and applied AI engineers—and
+for teams evaluating agent reliability.
 
-- Python 3.11 或更高版本。
-- Node.js 18 或更高版本。
-- pnpm。
-- 至少一个模型 API Key，例如 `DASHSCOPE_API_KEY`。
+## Architecture
 
-检查版本：
+Every channel normalizes incoming events into the same contract and calls the same Gateway.
+The Gateway assigns a trace ID and collision-resistant session key, loads the transcript, and
+invokes the shared embedded runtime. Model tool calls pass through one allowlisted tool registry;
+results return to model context before a normal final answer is delivered through the originating
+adapter. See [Architecture](docs/architecture.md).
 
-```bash
-python --version
-node --version
-pnpm --version
-```
+## Feature status
 
-如果没有 pnpm：
+| Capability | Status | Notes |
+|---|---|---|
+| WebChat workbench | Implemented | Default local channel; streaming trace, tools, reset, reconnect |
+| Slack Socket Mode | Implemented | DMs, mentions, threads, deduplication, retries, reconnect |
+| Discord Gateway + REST | Implemented | DMs, mentions, message references, heartbeat/resume, splitting |
+| Feishu long connection | Optional | Disabled by default; isolated guide and credentials |
+| Tavily search | Implemented | Primary structured search provider |
+| Bocha search | Optional fallback | Fallback reason is visible in results and traces |
+| Public webpage reading | Implemented | SSRF, redirect, timeout, type, and size protections |
+| OpenAI, Anthropic, DashScope | Implemented | Selects configured providers; Ollama adapter remains available |
+| Live Slack/Discord/Feishu verification | Environment-dependent | Requires credentials and external app setup |
 
-```bash
-npm install -g pnpm
-```
+Google Workspace, Gmail, Google Drive, Microsoft 365, Outlook, and Teams are not included.
 
-## 2. 安装依赖
+## Requirements
 
-从仓库根目录进入 Python 项目：
+- Python 3.11+
+- Node.js 20+ and pnpm
+- One supported model provider key for real model output
+- Tavily key for web search
 
-```bash
-cd muxtrail-py
-```
-
-安装后端：
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-安装前端：
+## Installation
 
 ```bash
-cd frontend
-pnpm install
-cd ..
-```
-
-## 3. 配置环境变量
-
-复制示例文件：
-
-```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+cd frontend && pnpm install && cd ..
 cp .env.example .env
 ```
 
-打开 `.env`，至少填写一个模型 Key：
+## Minimum configuration
 
-```text
-DASHSCOPE_API_KEY=你的 DashScope Key
-```
+Set one model key in `.env`, for example `OPENAI_API_KEY`. Optional channel credentials are not
+required for WebChat. State defaults to `.muxtrail-state`, which is ignored by Git.
 
-推荐同时配置 Bocha 搜索：
+## WebChat quick start
 
-```text
-BOCHA_API_KEY=你的 Bocha Key
-```
-
-如果要接飞书，还需要：
-具体的申请过程见 [feishurunbook.md](feishurunbook.md)。
-
-```text
-FEISHU_APP_ID=你的飞书 App ID
-FEISHU_APP_SECRET=你的飞书 App Secret
-FEISHU_DOCS_BASE_URL=https://你的企业域名.feishu.cn
-MUXTRAIL_FEISHU_DOCS_WRITE_ENABLED=true
-```
-
-`.env` 会被 Git 忽略，不要把真实密钥提交到仓库。
-
-## 4. 启动后端 Gateway
-
-普通本地启动：
+Terminal 1:
 
 ```bash
-python -m muxtrail.cli.main gateway run --host 127.0.0.1 --port 18789
+source .venv/bin/activate
+muxtrail gateway run --host 127.0.0.1 --port 18789
 ```
 
-如果要启用飞书长连接配置：
-
-```bash
-MUXTRAIL_CONFIG_PATH=examples/muxtrail.feishu.example.json \
-python -m muxtrail.cli.main gateway run --host 127.0.0.1 --port 18789
-```
-
-看到类似日志说明后端启动成功：
-
-```text
-provider_registered
-gateway_booted
-Uvicorn running on http://127.0.0.1:18789
-```
-
-检查接口：
-
-```bash
-curl -sS http://127.0.0.1:18789/health
-curl -sS http://127.0.0.1:18789/api/models
-curl -sS http://127.0.0.1:18789/api/channels/status
-```
-
-## 5. 启动前端工作台
-
-另开一个终端：
-
-```bash
-cd muxtrail-py/frontend
-pnpm dev --host 127.0.0.1 --port 3001
-```
-
-浏览器打开：
-
-```text
-http://127.0.0.1:3001/
-```
-
-页面三列含义：
-
-- 左侧：实时会话列表。
-- 中间：架构层、执行链路、运行追踪。
-- 右侧：最终输出、工具调用详情、当前消息上下文。
-
-## 6. 启动代码走读前端
-
-项目还包含一个面向教学的代码走读页面，用来按链路讲解消息入口、Gateway、Runtime、工具调用和飞书文档写入流程。
-
-如果第 5 步的前端开发服务已经启动，直接打开：
-
-```text
-http://127.0.0.1:3001/walkthrough.html
-```
-
-也可以单独启动：
-
-```bash
-cd muxtrail-py/frontend
-pnpm dev --host 127.0.0.1 --port 3001
-```
-
-生产构建时，`pnpm build` 会同时产出工作台首页和代码走读页：
-
-```text
-frontend/dist/index.html
-frontend/dist/walkthrough.html
-```
-
-## 7. 飞书机器人测试
-
-飞书开放平台需要完成：
-
-1. 创建企业自建应用。
-2. 开启机器人能力。
-3. 开通消息和文档权限。
-4. 使用长连接接收事件。
-5. 添加事件 `im.message.receive_v1`。
-6. 发布新版本。
-
-启动 Gateway 后，在飞书里给机器人发：
-
-```text
-你好，介绍一下你自己
-```
-
-创建飞书文档测试：
-
-```text
-建一个飞书文档，标题为 MuxTrail 测试，写一段项目说明，最后只回复文档链接
-```
-
-联网研究加飞书文档测试：
-
-```text
-联网搜索并分析 DeepSeek V4 的技术资料，写一个飞书文档，最后只回复文档链接
-```
-
-更详细的飞书配置见 [feishurunbook.md](feishurunbook.md)。
-
-## 8. 常用命令
-
-后端测试：
-
-```bash
-pytest
-```
-
-后端静态检查：
-
-```bash
-python -m ruff check .
-python -m mypy backend/src
-```
-
-前端构建：
+Terminal 2:
 
 ```bash
 cd frontend
-pnpm build
+pnpm dev --host 127.0.0.1 --port 3001
 ```
 
-## 9. 项目结构
+Open `http://127.0.0.1:3001`. Send a message and inspect the execution path, runtime timeline,
+model context, tool arguments/results, final response, and delivery status.
 
-```text
-muxtrail-py/
-├── backend/src/muxtrail/       # Python 后端
-│   ├── agents/                 # 模型运行、工具循环、system prompt
-│   ├── channels/               # 飞书、WebChat 等消息入口
-│   ├── cli/                    # 命令行入口
-│   ├── config/                 # 配置加载和环境变量替换
-│   ├── contracts/              # Pydantic 协议和配置契约
-│   ├── extensions/             # 模型供应商适配
-│   ├── gateway/                # FastAPI Gateway 和 WebSocket
-│   ├── sessions/               # 会话、transcript、压缩
-│   └── tools/                  # 工具注册、策略、内置工具
-├── frontend/                   # Vue 运行时工作台和代码走读前端
-├── tests/                      # 后端契约和集成测试
-├── examples/                   # 示例配置
-├── feishurunbook.md            # 飞书配置操作文档
-├── .env.example                # 本地环境变量模板
-└── pyproject.toml              # Python 包配置
+## Channel setup
+
+- [Slack Socket Mode setup](docs/slack-setup.md)
+- [Discord Gateway setup](docs/discord-setup.md)
+- [Optional Feishu setup](docs/feishu-optional.md)
+
+Each external channel is opt-in with `MUXTRAIL_<CHANNEL>_ENABLED=true` and uses the shared
+Gateway; no channel adapter calls a model provider directly.
+
+## Tavily setup
+
+Set `TAVILY_API_KEY`. The `web_search` tool returns structured evidence: title, URL, excerpt,
+score, rank, provider metadata, timing, retry count, and domain filters. Research flows should
+search, inspect results, fetch important sources with `web_fetch`, then answer from those sources.
+A zero-result search is explicitly not treated as evidence that information does not exist.
+
+## Tests and checks
+
+```bash
+pytest -q
+ruff check backend/src/muxtrail tests
+mypy backend/src/muxtrail
+cd frontend && pnpm build
 ```
 
-## 10. 排查
+Focused tests live in `tests/contract`, including mocked Slack/Discord round trips, Tavily,
+webpage safety, sessions, memory history, tools, and Feishu regressions.
 
-后端启动但没有模型回复：
+## Security notes
 
-- 检查 `.env` 里是否有模型 API Key。
-- 检查 `/api/models` 是否返回模型列表。
+MuxTrail redacts sensitive keys before config responses, traces, and structured logs. Channel
+tokens never belong in the browser or transcripts. Remote channels use the restricted `messaging`
+tool profile; tool calls are allowlisted, schema-validated, time-limited, and loop-bounded.
+`web_fetch` permits only public HTTP(S) destinations and validates redirect hops and resolved IPs.
+See [Security and privacy](docs/security.md).
 
-飞书主动发消息能收到，用户发消息没有回复：
+## Known limitations
 
-- 检查飞书应用是否发布了最新版本。
-- 检查事件订阅是否启用了长连接。
-- 检查是否添加了 `im.message.receive_v1`。
+- Live external-channel tests require the owner's credentials and were not run by mocked tests.
+- WebChat is a local development interface, not an internet-facing multi-tenant control plane.
+- Gateway authentication should be enabled before binding beyond loopback.
+- Session compaction is available, but quality depends on the configured model.
+- Slack and Discord adapters keep deduplication state in memory; restarts clear that cache.
 
-飞书文档只返回 ID，没有链接：
+## More documentation
 
-- 配置 `FEISHU_DOCS_BASE_URL=https://你的企业域名.feishu.cn`。
+- [Environment variables](docs/environment.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Demo script](docs/demo.md)
+- [Roadmap](docs/roadmap.md)
+- [Contributing](CONTRIBUTING.md)
 
-网络搜索不稳定：
+## License
 
-- 配置 `BOCHA_API_KEY`。
-- 搜索后让模型用 `web_fetch` 打开关键来源再写文档。
+MIT. See [LICENSE](LICENSE).

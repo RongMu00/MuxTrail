@@ -3,11 +3,11 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">MUXTRAIL</p>
-        <h1>运行时控制台</h1>
+        <h1>Runtime Workbench</h1>
       </div>
       <div class="top-metrics">
         <span>Gateway: 18789</span>
-        <span>前端: 3001</span>
+        <span>Workbench: 3001</span>
         <span>WebSocket: {{ connectionLabel(runtime.wsStatus) }}</span>
       </div>
     </header>
@@ -39,10 +39,10 @@ const runtime = useRuntimeStore()
 
 function connectionLabel(status: string) {
   const labels: Record<string, string> = {
-    connected: '已连接',
-    handshake: '握手中',
-    disconnected: '未连接',
-    error: '异常',
+    connected: 'Connected',
+    handshake: 'Connecting',
+    disconnected: 'Disconnected',
+    error: 'Error',
   }
   return labels[status] || status
 }

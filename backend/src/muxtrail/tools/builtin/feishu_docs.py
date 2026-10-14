@@ -310,9 +310,7 @@ def _ensure_explicit_feishu_doc_write_intent(context: Any = None) -> None:
     user_message = getattr(context, "user_message", None)
     if isinstance(user_message, str) and _has_explicit_doc_write_intent(user_message):
         return
-    raise RuntimeError(
-        "当前飞书消息没有明确要求创建或写入文档，已阻止文档写入工具执行。"
-    )
+    raise RuntimeError("当前飞书消息没有明确要求创建或写入文档，已阻止文档写入工具执行。")
 
 
 def _markdown_to_docx_blocks(markdown: str) -> list[dict[str, Any]]:

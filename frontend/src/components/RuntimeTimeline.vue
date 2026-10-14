@@ -2,16 +2,16 @@
   <section class="timeline">
     <div class="section-head">
       <div>
-        <p class="eyebrow">追踪</p>
-        <h3>{{ runtime.activeRun?.title || '暂无运行' }}</h3>
+        <p class="eyebrow">EXECUTION TRAIL</p>
+        <h3>{{ runtime.activeRun?.title || 'No run selected' }}</h3>
       </div>
       <span class="session-key">{{ runtime.activeRun?.sessionKey || '-' }}</span>
     </div>
 
     <div v-if="runtime.activeRun" class="conversation">
       <article class="bubble user">
-        <div class="bubble-label">用户消息</div>
-        <p>{{ runtime.activeRun.input || '等待消息进入。' }}</p>
+        <div class="bubble-label">User message</div>
+        <p>{{ runtime.activeRun.input || 'Waiting for a message.' }}</p>
       </article>
 
       <div v-if="runtime.activeRun.tools.length" class="tool-strip">
@@ -23,17 +23,17 @@
           </div>
           <p>{{ toolBrief(tool.result, tool.params) }}</p>
           <a v-if="toolUrl(tool.result)" :href="toolUrl(tool.result)" target="_blank" rel="noreferrer">
-            打开文档链接
+            Open document
           </a>
         </article>
       </div>
 
       <article class="bubble assistant">
-        <div class="bubble-label">最终回复（流式）</div>
-        <p>{{ runtime.activeRun.output || '等待模型输出。' }}</p>
+        <div class="bubble-label">Final response (streaming)</div>
+        <p>{{ runtime.activeRun.output || 'Waiting for model output.' }}</p>
       </article>
       <article v-if="runtime.activeRun.replyText" class="bubble reply">
-        <div class="bubble-label">通道回写</div>
+        <div class="bubble-label">Channel delivery</div>
         <p>{{ runtime.activeRun.replyText }}</p>
       </article>
     </div>
@@ -57,7 +57,7 @@
       </article>
     </div>
 
-    <div v-if="!runtime.activeEvents.length" class="empty">暂无事件。</div>
+    <div v-if="!runtime.activeEvents.length" class="empty">No runtime events yet.</div>
   </section>
 </template>
 
@@ -73,18 +73,18 @@ function formatTime(ts: number) {
 
 function eventTitle(event: RuntimeEventPayload) {
   const labels: Record<string, string> = {
-    'runtime.channel.inbound': '收到消息',
-    'runtime.session.loaded': '读取会话',
-    'runtime.run.started': '开始运行',
-    'runtime.messages.initial': '组装初始上下文',
-    'runtime.model.streaming': '模型流式输出',
-    'runtime.usage': 'Token 用量',
-    'runtime.tool.started': '开始调用工具',
-    'runtime.tool.finished': '工具返回结果',
-    'runtime.run.completed': '运行完成',
-    'runtime.run.failed': '运行失败',
-    'runtime.channel.reply_sent': '回复已发送',
-    'runtime.channel.reply_failed': '回复发送失败',
+    'runtime.channel.inbound': 'Message received',
+    'runtime.session.loaded': 'Session loaded',
+    'runtime.run.started': 'Run started',
+    'runtime.messages.initial': 'Model context assembled',
+    'runtime.model.streaming': 'Model output',
+    'runtime.usage': 'Token usage',
+    'runtime.tool.started': 'Tool started',
+    'runtime.tool.finished': 'Tool finished',
+    'runtime.run.completed': 'Run complete',
+    'runtime.run.failed': 'Run failed',
+    'runtime.channel.reply_sent': 'Reply delivered',
+    'runtime.channel.reply_failed': 'Reply delivery failed',
   }
   return labels[event.type] || event.title
 }
@@ -92,12 +92,12 @@ function eventTitle(event: RuntimeEventPayload) {
 function eventDetail(event: RuntimeEventPayload) {
   if (event.type === 'runtime.model.streaming') {
     const chars = String(event.detail || '').length
-    return chars ? `已输出 ${chars} 个字符，可见回复在上方持续更新。` : ''
+    return chars ? `${chars} characters streamed; the visible response is updating above.` : ''
   }
   if (event.type === 'runtime.tool.started') {
     const params = asRecord(event.data?.params)
-    const title = typeof params?.title === 'string' ? `，标题《${params.title}》` : ''
-    return `${event.detail || event.data?.tool || '工具'} 已开始${title}。`
+    const title = typeof params?.title === 'string' ? ` for “${params.title}”` : ''
+    return `${event.detail || event.data?.tool || 'Tool'} started${title}.`
   }
   if (event.type === 'runtime.tool.finished') {
     return toolBrief(event.data?.result, event.data?.params)
@@ -114,10 +114,10 @@ function eventKey(event: RuntimeEventPayload, index: number) {
 
 function toolStatus(status: RuntimeStatus) {
   const labels: Record<RuntimeStatus, string> = {
-    idle: '等待',
-    active: '调用中',
-    done: '已完成',
-    failed: '失败',
+    idle: 'Waiting',
+    active: 'Running',
+    done: 'Complete',
+    failed: 'Failed',
   }
   return labels[status]
 }
@@ -142,16 +142,16 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function toolBrief(result: unknown, params: unknown) {
   const parsed = asRecord(parseJsonish(result))
   if (parsed) {
-    const title = typeof parsed.title === 'string' ? `《${parsed.title}》` : ''
-    const blocks = typeof parsed.blocks_created === 'number' ? `，写入 ${parsed.blocks_created} 个块` : ''
+    const title = typeof parsed.title === 'string' ? ` “${parsed.title}”` : ''
+    const blocks = typeof parsed.blocks_created === 'number' ? ` with ${parsed.blocks_created} blocks` : ''
     const reply = typeof parsed.reply_text === 'string' ? parsed.reply_text.split('\n')[0] : ''
-    return reply || `工具已返回${title}${blocks}。`
+    return reply || `Tool returned${title}${blocks}.`
   }
   const parsedParams = asRecord(params)
   if (parsedParams && typeof parsedParams.title === 'string') {
-    return `准备处理《${parsedParams.title}》。`
+    return `Preparing “${parsedParams.title}”.`
   }
-  return result ? '工具已返回结果。' : '等待工具结果。'
+  return result ? 'Tool returned a result.' : 'Waiting for the tool result.'
 }
 
 function toolUrl(result: unknown) {

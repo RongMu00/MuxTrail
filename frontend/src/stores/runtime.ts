@@ -15,13 +15,13 @@ import type {
 } from '@/api/types'
 
 export const ARCHITECTURE_LAYERS: { id: LayerId; label: string; detail: string }[] = [
-  { id: 'channel', label: '通道层', detail: 'Feishu / WebChat 入口' },
-  { id: 'gateway', label: 'Gateway', detail: '路由与运行准备' },
-  { id: 'session', label: '会话层', detail: '状态与 transcript' },
-  { id: 'runtime', label: 'Runtime', detail: '消息循环' },
-  { id: 'provider', label: 'Provider', detail: '模型流式输出' },
-  { id: 'tools', label: '工具层', detail: '策略与执行' },
-  { id: 'reply', label: '回复层', detail: '通道回写' },
+  { id: 'channel', label: 'Channel', detail: 'WebChat / Slack / Discord / Feishu' },
+  { id: 'gateway', label: 'Gateway', detail: 'Routing and run preparation' },
+  { id: 'session', label: 'Session', detail: 'State and transcript' },
+  { id: 'runtime', label: 'Runtime', detail: 'Model and tool loop' },
+  { id: 'provider', label: 'Provider', detail: 'Streaming model output' },
+  { id: 'tools', label: 'Tools', detail: 'Policy and execution' },
+  { id: 'reply', label: 'Reply', detail: 'Channel delivery' },
 ]
 
 const emptyLayerStatus = (): Record<LayerId, RuntimeStatus> => ({
@@ -116,18 +116,28 @@ export const useRuntimeStore = defineStore('runtime', () => {
     const text = draft.value.trim()
     if (!text) return
     await connect()
-    sendStatus.value = '发送中'
+    sendStatus.value = 'Sending'
     draft.value = ''
     try {
       await gateway.send('sessions.send', {
         sessionKey: 'web:local',
         message: text,
       })
-      sendStatus.value = '已发送'
+      sendStatus.value = 'Sent'
       await loadSnapshot()
     } catch (error) {
-      sendStatus.value = error instanceof Error ? error.message : '发送失败'
+      sendStatus.value = error instanceof Error ? error.message : 'Send failed'
     }
+  }
+
+  async function resetActiveConversation() {
+    const sessionKey = activeRun.value?.sessionKey || 'web:local'
+    await connect()
+    await gateway.send('sessions.reset', { sessionKey })
+    runs.value = runs.value.filter((run) => run.sessionKey !== sessionKey)
+    activeRunId.value = ''
+    sendStatus.value = 'Conversation reset'
+    await loadSnapshot()
   }
 
   function handleAgentEvent(payload: any) {
@@ -252,7 +262,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     const streamEvent = {
       ...event,
       type: MODEL_STREAM_EVENT,
-      title: '模型流式输出',
+      title: 'Model output',
       detail: run.output,
       status: 'active' as RuntimeStatus,
     }
@@ -323,6 +333,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     connect,
     loadSnapshot,
     sendLocalMessage,
+    resetActiveConversation,
     selectRun,
   }
 })

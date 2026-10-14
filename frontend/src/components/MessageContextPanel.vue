@@ -1,8 +1,8 @@
 <template>
   <section class="messages-panel">
     <div class="tabs">
-      <button :class="{ active: tab === 'current' }" @click="tab = 'current'">当前上下文</button>
-      <button :class="{ active: tab === 'initial' }" @click="tab = 'initial'">初始消息</button>
+      <button :class="{ active: tab === 'current' }" @click="tab = 'current'">Current context</button>
+      <button :class="{ active: tab === 'initial' }" @click="tab = 'initial'">Initial messages</button>
     </div>
 
     <div class="message-list">
@@ -15,7 +15,7 @@
       </article>
     </div>
 
-    <div v-if="!messages.length" class="empty">暂无消息上下文。</div>
+    <div v-if="!messages.length" class="empty">No message context yet.</div>
   </section>
 </template>
 

@@ -17,11 +17,17 @@ export class GatewayClient {
   private pending = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>()
   private eventHandlers = new Map<string, ((payload: any) => void)[]>()
   private statusHandlers: ((status: string) => void)[] = []
+  private url = ''
+  private manualClose = false
+  private reconnectAttempt = 0
+  private reconnectTimer: number | null = null
 
   connect(url = `ws://${location.host}/ws`): Promise<any> {
     if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve(true)
     if (this.connectPromise) return this.connectPromise
 
+    this.url = url
+    this.manualClose = false
     this.connectPromise = new Promise((resolve, reject) => {
       this.ws = new WebSocket(url)
       this.ws.onopen = () => {
@@ -31,6 +37,7 @@ export class GatewayClient {
           client: { id: 'web-admin', version: '0.1.0', platform: 'browser', mode: 'local' }
         }).then((payload) => {
           this.emitStatus('connected')
+          this.reconnectAttempt = 0
           resolve(payload)
         }).catch(reject)
       }
@@ -40,9 +47,12 @@ export class GatewayClient {
         reject(new Error('WebSocket error'))
       }
       this.ws.onclose = () => {
+        for (const pending of this.pending.values()) pending.reject(new Error('Connection closed'))
+        this.pending.clear()
         this.ws = null
         this.connectPromise = null
         this.emitStatus('disconnected')
+        if (!this.manualClose) this.scheduleReconnect()
       }
     })
 
@@ -95,7 +105,20 @@ export class GatewayClient {
     this.statusHandlers.forEach((handler) => handler(status))
   }
 
+  private scheduleReconnect() {
+    if (this.reconnectTimer !== null) return
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempt, 15000)
+    this.reconnectAttempt += 1
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null
+      void this.connect(this.url).catch(() => undefined)
+    }, delay)
+  }
+
   disconnect() {
+    this.manualClose = true
+    if (this.reconnectTimer !== null) window.clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
     this.ws?.close()
     this.ws = null
     this.connectPromise = null

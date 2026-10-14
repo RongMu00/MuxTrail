@@ -2,11 +2,11 @@
   <section class="architecture">
     <div class="section-head">
       <div>
-        <p class="eyebrow">架构</p>
-        <h3>执行链路</h3>
+        <p class="eyebrow">Architecture</p>
+        <h3>Execution path</h3>
       </div>
       <div class="current-layer">
-        <span>当前位置</span>
+        <span>Current stage</span>
         <strong>{{ currentLayerLabel }}</strong>
       </div>
     </div>
@@ -23,7 +23,7 @@
         <strong class="layer-id">{{ layer.label }}</strong>
         <span class="layer-detail">{{ layer.detail }}</span>
         <div class="layer-event">
-          <span>最新事件</span>
+          <span>Latest event</span>
           <strong>{{ eventTitle(layer.latest) }}</strong>
           <time v-if="layer.latest">{{ formatTime(layer.latest.ts) }}</time>
         </div>
@@ -61,15 +61,15 @@ const currentLayerLabel = computed(() => {
     rows.find((row) => row.status === 'failed') ||
     [...rows].reverse().find((row) => row.status === 'active') ||
     [...rows].reverse().find((row) => row.status === 'done')
-  return current ? `${current.index}. ${current.label}` : '等待消息'
+  return current ? `${current.index}. ${current.label}` : 'Waiting for a message'
 })
 
 function statusLabel(status: RuntimeStatus) {
   const labels: Record<RuntimeStatus, string> = {
-    idle: '等待',
-    active: '进行中',
-    done: '完成',
-    failed: '失败',
+    idle: 'Waiting',
+    active: 'In progress',
+    done: 'Complete',
+    failed: 'Failed',
   }
   return labels[status]
 }
@@ -79,20 +79,20 @@ function formatTime(ts: number) {
 }
 
 function eventTitle(event?: RuntimeEventPayload) {
-  if (!event) return '尚未进入'
+  if (!event) return 'Not started'
   const labels: Record<string, string> = {
-    'runtime.channel.inbound': '收到消息',
-    'runtime.session.loaded': '读取会话',
-    'runtime.run.started': 'Gateway 启动运行',
-    'runtime.messages.initial': '组装上下文',
-    'runtime.model.streaming': '模型流式输出',
-    'runtime.usage': '统计 Token',
-    'runtime.tool.started': '开始调用工具',
-    'runtime.tool.finished': '工具返回',
-    'runtime.run.completed': '运行完成',
-    'runtime.run.failed': '运行失败',
-    'runtime.channel.reply_sent': '回复已发出',
-    'runtime.channel.reply_failed': '回复发送失败',
+    'runtime.channel.inbound': 'Message received',
+    'runtime.session.loaded': 'Session loaded',
+    'runtime.run.started': 'Gateway run started',
+    'runtime.messages.initial': 'Context assembled',
+    'runtime.model.streaming': 'Model output',
+    'runtime.usage': 'Token usage',
+    'runtime.tool.started': 'Tool started',
+    'runtime.tool.finished': 'Tool finished',
+    'runtime.run.completed': 'Run complete',
+    'runtime.run.failed': 'Run failed',
+    'runtime.channel.reply_sent': 'Reply delivered',
+    'runtime.channel.reply_failed': 'Reply delivery failed',
   }
   return labels[event.type] || event.title || event.type
 }

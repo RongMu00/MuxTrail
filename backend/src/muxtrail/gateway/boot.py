@@ -24,15 +24,18 @@ from muxtrail.agents.providers.registry import ProviderRegistry
 from muxtrail.agents.runtime.embedded.runner import EmbeddedRuntime
 from muxtrail.agents.runtime.registry import RuntimeRegistry
 from muxtrail.agents.system_prompt.builder import DEFAULT_MUXTRAIL_IDENTITY, build_system_prompt
+from muxtrail.channels.discord.plugin import DiscordChannelPlugin
 from muxtrail.channels.feishu.plugin import FeishuChannelPlugin
 from muxtrail.channels.registry import ChannelRegistry
 from muxtrail.channels.routing import resolve_session_key
+from muxtrail.channels.slack.plugin import SlackChannelPlugin
 from muxtrail.channels.webchat.plugin import WebChatPlugin
 from muxtrail.contracts.agent.runtime import AgentEventType, AgentRunRequest
 from muxtrail.contracts.channel.plugin import InboundMessage, OutboundMessage
 from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
 from muxtrail.core.logging import get_logger
 from muxtrail.core.paths import resolve_state_dir
+from muxtrail.core.redaction import redact
 from muxtrail.extensions.anthropic.provider import AnthropicProvider
 from muxtrail.extensions.dashscope.provider import DashScopeProvider
 from muxtrail.extensions.openai.provider import OpenAIProvider
@@ -68,7 +71,8 @@ def _redact_trace_value(value: Any, key: str = "") -> Any:
     if key and any(part in key.lower() for part in SECRET_KEY_PARTS):
         return "[redacted]"
     if isinstance(value, str):
-        return _truncate_trace_text(value)
+        safe = redact(value, key)
+        return _truncate_trace_text(str(safe))
     if isinstance(value, dict):
         return {
             str(item_key): _redact_trace_value(item_value, str(item_key))
@@ -168,9 +172,9 @@ def _extract_search_error(tool_result: Any) -> str | None:
 
 def _search_failure_reply(error: str) -> str:
     return (
-        f"本次搜索未获得符合要求的可验证来源：{error}。"
-        "这只表示当前搜索工具没有找到可用结果，不能据此判断相关事件未发生、"
-        "版本尚未发布或信息不存在。"
+        f"Search did not return usable, verifiable sources: {error}. "
+        "This only means the current search attempt found no usable evidence; it does not "
+        "show that an event did not happen or that the information does not exist."
     )
 
 
@@ -238,6 +242,7 @@ class GatewayRuntime:
         # 它不是业务执行必需项，但前端运行工作台依赖它实时展示执行链路。
         self._event_clients: dict[str, Any] | None = None
         self._event_seq = 0
+        self._started_channels: list[tuple[str, str]] = []
 
     def attach_event_clients(self, clients: dict[str, Any]) -> None:
         # FastAPI WebSocket 层管理连接池，GatewayRuntime 只保存引用并在运行时广播事件。
@@ -382,6 +387,8 @@ class GatewayRuntime:
         # Channel 是外部消息入口/出口的抽象。
         # WebChatPlugin 处理本地前端聊天；FeishuChannelPlugin 处理飞书机器人消息。
         self.channel_registry.register(WebChatPlugin())
+        self.channel_registry.register(SlackChannelPlugin(on_inbound=self._handle_inbound))
+        self.channel_registry.register(DiscordChannelPlugin(on_inbound=self._handle_inbound))
         # 飞书插件收到消息后不会自己跑模型，而是通过 on_inbound 回调交给 GatewayRuntime。
         feishu = FeishuChannelPlugin(on_inbound=self._handle_inbound)
         self.channel_registry.register(feishu)
@@ -395,6 +402,7 @@ class GatewayRuntime:
         channel: str | None = None,
         sender_id: str | None = None,
         conversation_id: str | None = None,
+        trace_id: str | None = None,
         system_prompt: str = DEFAULT_MUXTRAIL_IDENTITY,
         on_text_delta: Any = None,
     ) -> AgentRunResult:
@@ -415,11 +423,11 @@ class GatewayRuntime:
         返回值会收集最终文本、token 用量、错误信息，以及工具指定的 preferred reply。
         """
         result = AgentRunResult()
-        # run_id 是一次运行的短链路 id，用于把 runtime.event、日志和最终回复对应起来。
-        run_id = str(uuid.uuid4())[:8]
+        # A full trace ID correlates channel receipt, runtime work, tools, and delivery.
+        run_id = trace_id or str(uuid.uuid4())
         result.run_id = run_id
 
-        if channel and channel != "feishu":
+        if channel and trace_id is None:
             # 非飞书入口在这里补发“收到消息”事件；飞书入口会提前发，方便回复阶段复用同一个 run id。
             await self._emit_runtime_event(
                 "runtime.channel.inbound",
@@ -657,6 +665,8 @@ class GatewayRuntime:
                         data={
                             "tool": event.tool_name,
                             "result": event.tool_result,
+                            "durationMs": event.metadata.get("durationMs"),
+                            "success": event.metadata.get("success"),
                             "messages": _message_snapshot(current_messages),
                         },
                     )
@@ -709,7 +719,9 @@ class GatewayRuntime:
 
         # transcript 只把成功回复放回未来模型上下文。失败运行保留为 error 诊断记录，
         # 但 _history_for_model 会同时排除同一 run 的 user/error，避免污染后续对话。
-        response_text = "".join(result.texts) or "[No response]"
+        response_text = "".join(result.texts)
+        if not response_text:
+            response_text = result.error or "The model returned an empty response."
         if result.preferred_response:
             # current_messages 是给前端看的运行快照；这里补上一条最终 assistant 回复，
             # 让工具结果到最终回复之间的关系更清楚。
@@ -792,12 +804,15 @@ class GatewayRuntime:
         """
         # session_key 是通道消息进入 session 系统的路由键。
         # 它决定本条消息会读写哪份 transcript，也决定最终运行事件归属到哪个会话。
+        trace_id = message.trace_id or str(uuid.uuid4())
+        message.trace_id = trace_id
         session_key = resolve_session_key(message)
         log.info(
             "inbound_message",
             channel=message.channel,
             sender=message.sender_id,
             session_key=session_key,
+            run_id=trace_id,
             text=(message.text or "")[:100],
         )
         # 飞书入口会先在这里广播入站事件；run_agent_for_session 会复用同一个 session_key 继续广播。
@@ -809,17 +824,25 @@ class GatewayRuntime:
             detail=message.text or "",
             data={
                 "channel": message.channel,
+                "accountId": message.account_id,
+                "workspaceId": message.workspace_id,
                 "chatType": message.chat_type,
                 "senderId": message.sender_id,
                 "conversationId": message.conversation_id,
+                "threadId": message.thread_id,
+                "messageId": message.message_id,
+                "traceId": trace_id,
                 "message": message.text or "",
             },
         )
 
         # 记录最近通道路由，后续会话操作才能知道应回到哪个 channel/conversation。
         # 例如某些本地 session 操作需要知道“上一次这条会话来自飞书哪个 conversation”。
+        if self.session_store.get(session_key) is None:
+            self.session_store.create(session_key, channel=message.channel)
         route_patch = build_last_route_patch(message)
         self.session_store.update(session_key, route_patch)
+        self.session_store.save()
 
         # 进入统一 agent 主线。这里不关心飞书细节，只传入标准字段：
         # user_message、channel、sender_id、conversation_id。
@@ -829,20 +852,29 @@ class GatewayRuntime:
             channel=message.channel,
             sender_id=message.sender_id,
             conversation_id=message.conversation_id,
+            trace_id=trace_id,
         )
 
-        response_text = "".join(result.texts) or "[No response]"
+        response_text = "".join(result.texts)
+        if not response_text:
+            response_text = result.error or "The model returned an empty response."
 
         # 具体回复方式交给 channel plugin 处理，例如飞书会根据 replyToId 选择回复或发新消息。
         channel_plugin = self.channel_registry.get(message.channel)
         if channel_plugin:
             # reply_to 对飞书很重要：有 message_id 时可以回复原消息，群聊里上下文更清楚。
-            reply_to = message.raw.get("message_id") if message.raw else None
-            outbound = OutboundMessage(text=response_text, replyToId=reply_to)
+            reply_to = message.reply_target or message.message_id
+            outbound = OutboundMessage(
+                text=response_text,
+                replyToId=reply_to,
+                threadId=message.thread_id,
+                traceId=trace_id,
+            )
             try:
                 # account_id 支持一个 channel 下多个账号；没有显式账号时使用 default。
-                account_id = message.raw.get("account_id", "default") if message.raw else "default"
-                await channel_plugin.send(account_id, message.conversation_id, outbound)
+                delivery = await channel_plugin.send(
+                    message.account_id, message.conversation_id, outbound
+                )
                 await self._emit_runtime_event(
                     "runtime.channel.reply_sent",
                     layer="reply",
@@ -855,6 +887,8 @@ class GatewayRuntime:
                         "channel": message.channel,
                         "conversationId": message.conversation_id,
                         "replyTo": reply_to,
+                        "traceId": trace_id,
+                        "delivery": delivery,
                         "text": response_text,
                     },
                 )
@@ -904,6 +938,7 @@ class GatewayRuntime:
                 try:
                     # 一个通道可以配置多个账号；逐个启动，单个账号失败不阻塞其他账号。
                     await channel.start(account_id, config_dict)
+                    self._started_channels.append((channel_id, account_id))
                     log.info("channel_started", channel=channel_id, account=account_id)
                 except Exception as e:
                     log.error(
@@ -916,11 +951,11 @@ class GatewayRuntime:
     async def stop_channels(self) -> None:
         # stop_channels 在服务关闭时调用，尽量让每个通道释放后台连接。
         # 关闭失败只记录日志，不向外抛出，避免影响其他通道的清理流程。
-        for channel_id in self.channel_registry.list_ids():
+        for channel_id, account_id in reversed(self._started_channels):
             channel = self.channel_registry.get(channel_id)
             if channel:
                 try:
-                    for account_id in channel.list_account_ids({}):
-                        await channel.stop(account_id)
+                    await channel.stop(account_id)
                 except Exception as e:
                     log.error("channel_stop_failed", channel=channel_id, error=str(e))
+        self._started_channels.clear()

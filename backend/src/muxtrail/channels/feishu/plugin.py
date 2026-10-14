@@ -45,10 +45,10 @@ class FeishuChannelPlugin:
     def meta(self) -> ChannelMeta:
         return ChannelMeta(
             id="feishu",
-            label="飞书",
+            label="Feishu",
             selectionLabel="Feishu",
             docsPath="docs/channels/feishu",
-            blurb="飞书机器人 — WebSocket 长连接",
+            blurb="Optional Feishu bot using a long-lived WebSocket connection",
             markdownCapable=True,
         )
 
@@ -59,7 +59,10 @@ class FeishuChannelPlugin:
     def list_account_ids(self, config: dict[str, Any]) -> "list[str]":
         channels_cfg = config.get("channels", {})
         feishu_cfg = channels_cfg.get("feishu", {})
-        if feishu_cfg.get("enabled") is False:
+        enabled = feishu_cfg.get("enabled") is True or os.environ.get(
+            "MUXTRAIL_FEISHU_ENABLED", ""
+        ).lower() in {"1", "true", "yes", "on"}
+        if not enabled:
             return []
         accounts = feishu_cfg.get("accounts", {})
         enabled_accounts = [
@@ -199,11 +202,10 @@ class FeishuChannelPlugin:
         """向飞书会话发送纯文本消息；如果有 reply_to_id 则回复原消息。"""
         client = self._clients.get(account_id) or self._clients.get("default")
         if not client:
-            log.error("feishu_client_not_initialized")
-            return
+            raise RuntimeError("Feishu channel is not started")
         text = format_outbound(message)
         if not text:
-            return
+            raise ValueError("Feishu cannot send an empty message")
 
         # 有原消息 id 时优先回复原消息；没有时退化为向会话直接发送文本。
         if message.reply_to_id:

@@ -223,7 +223,8 @@ class DiscordChannelPlugin:
             return False
         guild_id = str(data.get("guild_id") or "")
         is_dm = not guild_id
-        mentions = data.get("mentions") if isinstance(data.get("mentions"), list) else []
+        raw_mentions = data.get("mentions")
+        mentions: list[Any] = raw_mentions if isinstance(raw_mentions, list) else []
         mentioned = any(
             str(item.get("id") or "") == self._bot_user_id
             for item in mentions

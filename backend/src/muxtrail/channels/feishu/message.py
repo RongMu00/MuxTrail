@@ -87,8 +87,11 @@ def parse_inbound(event_data: dict[str, Any]) -> InboundMessage | None:
     return InboundMessage(
         channel="feishu",
         accountId=event_data.get("account_id", "default"),
+        workspaceId=str(event_data.get("tenant_key") or "default"),
         senderId=str(sender_id or ""),
         conversationId=str(chat_id or ""),
+        messageId=str(message_id or ""),
+        replyTarget=str(message_id or ""),
         text=_AT_TAG_RE.sub("", text).strip(),
         chatType="group" if chat_type == "group" else "dm",
         raw=raw,

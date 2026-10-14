@@ -112,6 +112,8 @@ class SlackChannelPlugin:
                 )
             response.raise_for_status()
             data = response.json()
+            if not isinstance(data, dict):
+                raise RuntimeError(f"Slack API {method} returned an invalid response")
             if not data.get("ok"):
                 raise RuntimeError(
                     f"Slack API {method} failed: {data.get('error', 'unknown_error')}"
@@ -128,6 +130,8 @@ class SlackChannelPlugin:
             raise RuntimeError("Slack app-level token was rejected")
         response.raise_for_status()
         data = response.json()
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Slack API {method} returned an invalid response")
         if not data.get("ok"):
             raise RuntimeError(f"Slack API {method} failed: {data.get('error', 'unknown_error')}")
         return data

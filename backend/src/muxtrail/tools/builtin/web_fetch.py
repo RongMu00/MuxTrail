@@ -245,9 +245,14 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0), follow_redirects=False) as client:
             current_url = url
-            resp: httpx.Response | None = None
+            status_code: int | None = None
+            final_url = current_url
+            content_type = ""
+            encoding = "utf-8"
+            body = bytearray()
             for redirect_count in range(MAX_REDIRECTS + 1):
-                resp = await client.get(
+                async with client.stream(
+                    "GET",
                     current_url,
                     headers={
                         "User-Agent": (
@@ -257,52 +262,60 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
                         "Accept": "text/html,application/xhtml+xml,application/xml,text/plain,"
                         "application/json;q=0.9,*/*;q=0.8",
                     },
-                )
-                if resp.status_code not in {301, 302, 303, 307, 308}:
+                ) as resp:
+                    status_code = resp.status_code
+                    final_url = str(resp.url)
+                    content_type = resp.headers.get("content-type", "")
+                    encoding = resp.encoding or "utf-8"
+                    if resp.status_code in {301, 302, 303, 307, 308}:
+                        location = resp.headers.get("location")
+                        if not location:
+                            break
+                        if redirect_count == MAX_REDIRECTS:
+                            return {
+                                "ok": False,
+                                "error": "Fetch failed: too many redirects",
+                                "url": raw_url,
+                            }
+                        current_url = await _validate_public_destination(
+                            urljoin(str(resp.url), location)
+                        )
+                        continue
+                    content_length_header = resp.headers.get("content-length")
+                    if (
+                        content_length_header
+                        and content_length_header.isdigit()
+                        and int(content_length_header) > MAX_RESPONSE_BYTES
+                    ):
+                        return {
+                            "ok": False,
+                            "url": raw_url,
+                            "final_url": final_url,
+                            "status": resp.status_code,
+                            "error": f"Response exceeds {MAX_RESPONSE_BYTES} byte limit",
+                        }
+                    if 200 <= resp.status_code < 400 and _is_text_content_type(content_type):
+                        async for chunk in resp.aiter_bytes():
+                            body.extend(chunk)
+                            if len(body) > MAX_RESPONSE_BYTES:
+                                return {
+                                    "ok": False,
+                                    "url": raw_url,
+                                    "final_url": final_url,
+                                    "status": resp.status_code,
+                                    "error": f"Response exceeds {MAX_RESPONSE_BYTES} byte limit",
+                                }
                     break
-                location = resp.headers.get("location")
-                if not location:
-                    break
-                if redirect_count == MAX_REDIRECTS:
-                    return {
-                        "ok": False,
-                        "error": "Fetch failed: too many redirects",
-                        "url": raw_url,
-                    }
-                current_url = await _validate_public_destination(urljoin(str(resp.url), location))
-            if resp is None:
+            if status_code is None:
                 raise RuntimeError("request did not produce a response")
     except Exception as e:
         return {"ok": False, "error": f"Fetch failed: {e}", "url": raw_url}
 
-    content_type = resp.headers.get("content-type", "")
-    final_url = str(resp.url)
-    content_length_header = resp.headers.get("content-length")
-    if (
-        content_length_header
-        and content_length_header.isdigit()
-        and int(content_length_header) > MAX_RESPONSE_BYTES
-    ):
-        return {
-            "ok": False,
-            "url": raw_url,
-            "final_url": final_url,
-            "status": resp.status_code,
-            "error": f"Response exceeds {MAX_RESPONSE_BYTES} byte limit",
-        }
-    if len(resp.content) > MAX_RESPONSE_BYTES:
-        return {
-            "ok": False,
-            "url": raw_url,
-            "final_url": final_url,
-            "status": resp.status_code,
-            "error": f"Response exceeds {MAX_RESPONSE_BYTES} byte limit",
-        }
     result: dict[str, Any] = {
-        "ok": 200 <= resp.status_code < 400,
+        "ok": 200 <= status_code < 400,
         "url": raw_url,
         "final_url": final_url,
-        "status": resp.status_code,
+        "status": status_code,
         "content_type": content_type,
     }
     if not result["ok"]:
@@ -317,7 +330,7 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
                 "truncated": False,
                 "content_length": 0,
                 "links": [],
-                "error": f"Fetch failed: HTTP {resp.status_code}",
+                "error": f"Fetch failed: HTTP {status_code}",
             }
         )
         return result
@@ -334,12 +347,12 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
         )
         return result
 
+    text = bytes(body).decode(encoding, errors="replace")
     if "text/html" in content_type.lower() and not raw:
         # 默认提取可读正文；raw 模式主要用于调试或确实需要查看网页源码时。
-        result.update(_extract_html(resp.text, final_url, max_chars, extract_links))
+        result.update(_extract_html(text, final_url, max_chars, extract_links))
         return result
 
-    text = resp.text
     result.update(
         {
             "title": "",

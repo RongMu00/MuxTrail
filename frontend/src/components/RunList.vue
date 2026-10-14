@@ -6,6 +6,7 @@
         <h2>Live sessions</h2>
       </div>
       <div class="panel-actions">
+        <button class="ghost-btn" @click="runtime.createConversation">New</button>
         <button class="ghost-btn" @click="runtime.loadSnapshot">Refresh</button>
         <button class="ghost-btn" @click="runtime.resetActiveConversation">Reset</button>
       </div>
@@ -22,6 +23,25 @@
       </div>
     </div>
 
+    <div class="section-label">Conversations</div>
+    <div class="runs sessions">
+      <button
+        v-for="session in runtime.sessions"
+        :key="session.key"
+        :class="['run-row', { active: session.key === runtime.activeSessionKey }]"
+        @click="runtime.selectSession(session.key)"
+      >
+        <span :class="['dot', session.status || 'idle']"></span>
+        <span class="run-main">
+          <span class="run-title">{{ session.label || session.key }}</span>
+          <span class="run-sub">{{ session.channel || 'WebChat' }} · {{ session.model || 'No run yet' }}</span>
+        </span>
+        <span class="run-time">{{ formatTime(session.updatedAt) }}</span>
+      </button>
+    </div>
+    <div v-if="!runtime.sessions.length" class="empty">No saved conversations yet.</div>
+
+    <div class="section-label">Execution runs</div>
     <div class="runs">
       <button
         v-for="run in runtime.runs"
@@ -141,6 +161,16 @@ h2 {
   min-height: 0;
   overflow: visible;
   padding: 8px;
+}
+.sessions {
+  border-bottom: 1px solid var(--border);
+}
+.section-label {
+  padding: 10px 20px 4px;
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 .run-row {
   width: 100%;

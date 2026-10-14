@@ -7,7 +7,14 @@ from typing import Any
 
 SENSITIVE_KEYS = ("secret", "token", "password", "api_key", "apikey", "authorization")
 TOKEN_PATTERN = re.compile(
-    r"(?i)(bearer\s+)[A-Za-z0-9._~-]{8,}|\b(?:xox[baprs]-|xapp-)[A-Za-z0-9-]+"
+    r"(?i)"
+    r"(bearer\s+)[A-Za-z0-9._~-]{8,}"
+    r"|\b(?:xox[baprs]-|xapp-)[A-Za-z0-9-]{8,}"
+    r"|\bsk-ant-[A-Za-z0-9_-]{16,}\b"
+    r"|\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{16,}\b"
+    r"|\btvly-[A-Za-z0-9_-]{16,}\b"
+    r"|\bmfa\.[A-Za-z0-9_-]{20,}\b"
+    r"|\b[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{25,}\b"
 )
 
 

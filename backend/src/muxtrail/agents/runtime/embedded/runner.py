@@ -116,13 +116,13 @@ class EmbeddedRuntime:
             provider = self._provider_registry.get(request.provider_id)
 
         if provider is None:
-            # 没有 provider 时走 mock 回显，便于无 API Key 的本地开发和协议联调。
-            # 真实飞书运行不应该走到这里；如果走到这里，说明 provider 注册或配置有问题。
             yield AgentEvent(
-                type=AgentEventType.TEXT_DELTA, text=f"[mock] Echo: {request.user_message}"
+                type=AgentEventType.ERROR,
+                error=(
+                    f"Model provider '{request.provider_id}' is not configured. "
+                    "Set a supported provider API key and restart MuxTrail."
+                ),
             )
-            yield AgentEvent(type=AgentEventType.USAGE, input_tokens=5, output_tokens=10)
-            yield AgentEvent(type=AgentEventType.COMPLETE)
             return
 
         # Gateway 传进来的 request.history 已经是筛选后的历史消息。

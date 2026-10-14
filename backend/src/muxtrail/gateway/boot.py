@@ -483,7 +483,7 @@ class GatewayRuntime:
             entry.session_id,
             {
                 "role": "user",
-                "content": user_message,
+                "content": str(redact(user_message)),
                 "runId": run_id,
                 "ts": int(time.time() * 1000),
             },
@@ -736,7 +736,7 @@ class GatewayRuntime:
                 entry.session_id,
                 {
                     "role": "error",
-                    "content": result.error,
+                    "content": str(redact(result.error)),
                     "runId": run_id,
                     "ts": int(time.time() * 1000),
                 },
@@ -746,7 +746,7 @@ class GatewayRuntime:
                 entry.session_id,
                 {
                     "role": "assistant",
-                    "content": response_text,
+                    "content": str(redact(response_text)),
                     "runId": run_id,
                     "ts": int(time.time() * 1000),
                 },

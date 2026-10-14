@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
 import pytest
-from muxtrail.tools.builtin.web_fetch import create_web_fetch_tool, extract_text
+from muxtrail.tools.builtin.web_fetch import MAX_RESPONSE_BYTES, create_web_fetch_tool, extract_text
 
 
 @pytest.mark.asyncio
@@ -139,6 +140,34 @@ async def test_web_fetch_rejects_unsafe_redirect(httpx_mock: Any) -> None:
 
     assert result["ok"] is False
     assert "private" in result["error"] or "loopback" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_stops_stream_when_response_exceeds_byte_cap(httpx_mock: Any) -> None:
+    class CountingStream(httpx.AsyncByteStream):
+        def __init__(self) -> None:
+            self.chunks_read = 0
+
+        async def __aiter__(self):
+            for _ in range(5):
+                self.chunks_read += 1
+                yield b"x" * (MAX_RESPONSE_BYTES // 2)
+
+    stream = CountingStream()
+    httpx_mock.add_response(
+        method="GET",
+        url="https://example.com/large",
+        headers={"content-type": "text/plain"},
+        stream=stream,
+    )
+    tool = create_web_fetch_tool()
+    assert tool.handler is not None
+
+    result = await tool.handler({"url": "https://example.com/large"}, None)
+
+    assert result["ok"] is False
+    assert "byte limit" in result["error"]
+    assert stream.chunks_read == 3
 
 
 def test_web_fetch_tool_exposes_research_prompt_instruction() -> None:

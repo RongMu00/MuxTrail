@@ -66,12 +66,20 @@ export interface ToolCallTrace {
   result?: unknown
   startedAt?: number
   finishedAt?: number
+  durationMs?: number
 }
 
 export interface RunTrace {
   id: string
   sessionKey: string
   channel?: string
+  accountId?: string
+  workspaceId?: string
+  userId?: string
+  conversationId?: string
+  threadId?: string
+  sessionId?: string
+  traceId?: string
   title: string
   status: RuntimeStatus
   startedAt: number
@@ -81,6 +89,8 @@ export interface RunTrace {
   input?: string
   output: string
   replyText?: string
+  runtimeMs?: number
+  error?: string
   initialMessages: RuntimeMessage[]
   currentMessages: RuntimeMessage[]
   tools: ToolCallTrace[]

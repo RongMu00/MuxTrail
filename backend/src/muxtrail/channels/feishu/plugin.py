@@ -47,7 +47,7 @@ class FeishuChannelPlugin:
             id="feishu",
             label="Feishu",
             selectionLabel="Feishu",
-            docsPath="docs/channels/feishu",
+            docsPath="docs/feishu-optional.md",
             blurb="Optional Feishu bot using a long-lived WebSocket connection",
             markdownCapable=True,
         )

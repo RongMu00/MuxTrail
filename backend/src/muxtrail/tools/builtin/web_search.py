@@ -540,12 +540,23 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
             return primary
     else:
         primary = await _duckduckgo_search(params)
+        primary["fallback_from"] = "tavily"
+        primary["fallback_reason"] = "TAVILY_API_KEY is not configured"
         if primary.get("results"):
             return primary
 
     fallback = await _bing_rss_search(params)
     if fallback.get("results"):
-        fallback["fallback_from"] = primary.get("provider", "unknown")
+        primary_provider = primary.get("provider", "unknown")
+        if primary_provider == "duckduckgo" and primary.get("fallback_from"):
+            fallback["fallback_from"] = primary["fallback_from"]
+            fallback["fallback_reason"] = primary.get("fallback_reason", "")
+            fallback["intermediate_provider"] = primary_provider
+        else:
+            fallback["fallback_from"] = primary_provider
+            fallback["fallback_reason"] = primary.get(
+                "error", "Primary provider returned no usable results"
+            )
         fallback["primary_error"] = primary.get("error", "")
         if primary.get("attempted_queries"):
             fallback["primary_attempted_queries"] = primary["attempted_queries"]

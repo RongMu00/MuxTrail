@@ -4,7 +4,7 @@
 |---|---:|---|
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `DASHSCOPE_API_KEY` | One | Model provider |
 | `TAVILY_API_KEY` | For search | Primary structured web search |
-| `BOCHA_API_KEY` | No | Explicit search fallback |
+| `BOCHA_API_KEY` | No | Keyed fallback after Tavily; without either key, public DuckDuckGo/Bing fallback is attempted and explicitly traced |
 | `MUXTRAIL_STATE_DIR` | No | State directory; defaults to `.muxtrail-state` |
 | `MUXTRAIL_CONFIG_PATH` | No | Config file override |
 | `MUXTRAIL_SLACK_ENABLED` | No | Enable Slack Socket Mode |

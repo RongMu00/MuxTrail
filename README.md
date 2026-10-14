@@ -27,7 +27,7 @@ adapter. See [Architecture](docs/architecture.md).
 | Discord Gateway + REST | Implemented | DMs, mentions, message references, heartbeat/resume, splitting |
 | Feishu long connection | Optional | Disabled by default; isolated guide and credentials |
 | Tavily search | Implemented | Primary structured search provider |
-| Bocha search | Optional fallback | Fallback reason is visible in results and traces |
+| Search fallback | Optional | Bocha when keyed; public DuckDuckGo/Bing when Tavily is unconfigured, with visible provenance |
 | Public webpage reading | Implemented | SSRF, redirect, timeout, type, and size protections |
 | OpenAI, Anthropic, DashScope | Implemented | Selects configured providers; Ollama adapter remains available |
 | Live Slack/Discord/Feishu verification | Environment-dependent | Requires credentials and external app setup |
@@ -90,6 +90,9 @@ Set `TAVILY_API_KEY`. The `web_search` tool returns structured evidence: title, 
 score, rank, provider metadata, timing, retry count, and domain filters. Research flows should
 search, inspect results, fetch important sources with `web_fetch`, then answer from those sources.
 A zero-result search is explicitly not treated as evidence that information does not exist.
+Without a Tavily key, MuxTrail may query public DuckDuckGo and Bing RSS endpoints. Results expose
+`fallback_from`, `fallback_reason`, and the actual provider, so the fallback is not silent. Public
+fallbacks are less reliable and may be blocked or rate-limited; use Tavily for production.
 
 ## Tests and checks
 

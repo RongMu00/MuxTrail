@@ -247,6 +247,38 @@ async def test_duckduckgo_challenge_is_reported_as_an_error(
 
 
 @pytest.mark.asyncio
+async def test_public_search_fallback_reports_missing_tavily_provenance(
+    httpx_mock: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    monkeypatch.delenv("BOCHA_API_KEY", raising=False)
+    httpx_mock.add_response(
+        method="POST",
+        url="https://html.duckduckgo.com/html/",
+        html="<html><body>No results</body></html>",
+    )
+    httpx_mock.add_response(
+        method="GET",
+        url="https://www.bing.com/search?format=rss&q=MuxTrail",
+        headers={"content-type": "text/xml"},
+        text=(
+            "<?xml version='1.0'?><rss><channel><item><title>Source</title>"
+            "<link>https://example.com/source</link><description>Evidence</description>"
+            "</item></channel></rss>"
+        ),
+    )
+    tool = create_web_search_tool()
+    assert tool.handler is not None
+
+    result = await tool.handler({"query": "MuxTrail"}, None)
+
+    assert result["provider"] == "bing-rss"
+    assert result["fallback_from"] == "tavily"
+    assert result["fallback_reason"] == "TAVILY_API_KEY is not configured"
+    assert result["intermediate_provider"] == "duckduckgo"
+
+
+@pytest.mark.asyncio
 async def test_official_source_request_requires_include_domain(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

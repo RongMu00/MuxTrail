@@ -160,8 +160,44 @@ h1 {
   scrollbar-gutter: stable;
 }
 @media (max-width: 960px) {
+  html,
+  body,
+  #app {
+    height: auto;
+    min-height: 100%;
+    overflow: auto;
+  }
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    max-height: none;
+    overflow: visible;
+  }
   .workspace {
+    display: flex;
+    flex-direction: column;
     grid-template-columns: 1fr;
+    flex: none;
+    height: auto;
+    min-height: calc(100dvh - 72px);
+    overflow: visible;
+  }
+  .workspace > * {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
+  .run-list {
+    max-height: 42dvh;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .main-stage {
+    min-height: 70dvh;
+    grid-template-rows: minmax(360px, 1fr) auto;
+  }
+  .inspector {
+    min-height: 50dvh;
   }
 }
 @media (max-width: 820px) {
@@ -180,8 +216,9 @@ h1 {
   }
   .workspace {
     grid-template-columns: 1fr;
-    flex-basis: calc(100dvh - 128px);
-    height: calc(100dvh - 128px);
+    flex-basis: auto;
+    height: auto;
+    min-height: calc(100dvh - 128px);
   }
 }
 </style>

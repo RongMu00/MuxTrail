@@ -78,3 +78,22 @@ async def test_messaging_profile_denies_bash_tool() -> None:
 
     results = await collect()
     assert "denied by policy" in results[0]
+
+
+@pytest.mark.asyncio
+async def test_missing_provider_returns_configuration_error_not_mock_echo() -> None:
+    runtime = EmbeddedRuntime(provider_registry=ProviderRegistry(), tool_registry=ToolRegistry())
+    request = AgentRunRequest(
+        run_id="run-missing",
+        session_key="web:missing",
+        provider_id="openai",
+        model_id="gpt-4o",
+        system_prompt="",
+        user_message="hello",
+    )
+
+    events = [event async for event in runtime.run(request, asyncio.Event())]
+
+    assert [event.type for event in events] == [AgentEventType.ERROR]
+    assert "not configured" in str(events[0].error)
+    assert all("[mock]" not in str(event.text) for event in events)

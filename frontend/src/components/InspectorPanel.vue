@@ -7,6 +7,11 @@
         <span>{{ runtime.activeRun?.provider || '-' }}</span>
         <span>{{ runtime.activeRun?.model || '-' }}</span>
       </div>
+      <dl v-if="runtime.activeRun" class="trace-facts">
+        <template v-for="fact in traceFacts" :key="fact.label">
+          <dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd>
+        </template>
+      </dl>
     </div>
 
     <div class="output">
@@ -23,11 +28,31 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import MessageContextPanel from '@/components/MessageContextPanel.vue'
 import ToolCallPanel from '@/components/ToolCallPanel.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 
 const runtime = useRuntimeStore()
+const traceFacts = computed(() => {
+  const run = runtime.activeRun
+  if (!run) return []
+  return [
+    ['Channel', run.channel],
+    ['Account', run.accountId],
+    ['Workspace / server', run.workspaceId],
+    ['Safe user', run.userId],
+    ['Conversation', run.conversationId],
+    ['Thread', run.threadId],
+    ['Session key', run.sessionKey],
+    ['Session ID', run.sessionId],
+    ['Trace ID', run.traceId || run.id],
+    ['Provider', run.provider],
+    ['Model', run.model],
+    ['Overall latency', run.runtimeMs ? `${run.runtimeMs} ms` : ''],
+    ['Error', run.error],
+  ].filter((item) => item[1]).map(([label, value]) => ({ label, value }))
+})
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
@@ -81,6 +106,15 @@ h2 {
   color: var(--muted);
   font: 700 10px/1 var(--mono);
 }
+.trace-facts {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 14px 0 0;
+  font: 600 10px/1.4 var(--mono);
+}
+.trace-facts dt { color: var(--muted); }
+.trace-facts dd { margin: 0; overflow-wrap: anywhere; }
 .output {
   border-bottom: 1px solid var(--border);
 }

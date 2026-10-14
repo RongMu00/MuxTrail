@@ -12,7 +12,9 @@
             <span :class="['tool-status', tool.status]"></span>
             <strong>{{ tool.name }}</strong>
           </div>
-          <span class="status-label">{{ statusLabel(tool.status) }}</span>
+          <span class="status-label">
+            {{ statusLabel(tool.status) }}{{ tool.durationMs !== undefined ? ` · ${tool.durationMs} ms` : '' }}
+          </span>
         </div>
         <div v-if="hasResult(tool.result)" class="result-block">
           <div class="result-top">

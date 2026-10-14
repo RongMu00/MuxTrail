@@ -32,27 +32,25 @@ async def handle_chat_send(
     # Get runtime from app state (injected later in Phase 6 wiring)
     runtime = getattr(state, "runtime", None)
     if runtime is None:
-        # Mock response for now
         await client.send_json(
             make_event(
                 "agent.event",
                 {
-                    "type": "text_delta",
+                    "type": "error",
                     "sessionKey": session_key,
-                    "text": f"[mock] Echo: {message}",
+                    "error": (
+                        "WebChat runtime is unavailable. Configure a supported model provider "
+                        "API key and restart MuxTrail."
+                    ),
                 },
             )
         )
-        await client.send_json(
-            make_event(
-                "agent.event",
-                {
-                    "type": "complete",
-                    "sessionKey": session_key,
-                },
-            )
-        )
-        return {"runId": run_id, "sessionKey": session_key}
+        return {
+            "ok": False,
+            "runId": run_id,
+            "sessionKey": session_key,
+            "error": {"code": "RUNTIME_UNAVAILABLE", "message": "Model runtime unavailable"},
+        }
 
     # Real runtime path
     abort_signal = asyncio.Event()

@@ -76,6 +76,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const sendStatus = ref('')
   const runs = ref<RunTrace[]>([])
   const activeRunId = ref('')
+  const activeSessionKey = ref('web:local')
   const sessions = ref<SessionEntry[]>([])
   const channels = ref<ChannelStatus[]>([])
   const models = ref<ModelInfo[]>([])
@@ -83,6 +84,9 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const connectedOnce = ref(false)
 
   const activeRun = computed(() => runs.value.find((run) => run.id === activeRunId.value))
+  const selectedSession = computed(() =>
+    sessions.value.find((session) => session.key === activeSessionKey.value),
+  )
   const activeEvents = computed(() => activeRun.value?.events || [])
   const activeMessages = computed(() => {
     const run = activeRun.value
@@ -107,7 +111,12 @@ export const useRuntimeStore = defineStore('runtime', () => {
       api.getChannelStatus(),
       api.getModels(),
     ])
-    if (sessionData.status === 'fulfilled') sessions.value = sessionData.value.sessions || []
+    if (sessionData.status === 'fulfilled') {
+      sessions.value = sessionData.value.sessions || []
+      if (!sessions.value.some((session) => session.key === activeSessionKey.value)) {
+        activeSessionKey.value = sessions.value[0]?.key || 'web:local'
+      }
+    }
     if (channelData.status === 'fulfilled') channels.value = channelData.value.channels || []
     if (modelData.status === 'fulfilled') models.value = modelData.value.models || []
   }
@@ -120,7 +129,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     draft.value = ''
     try {
       await gateway.send('sessions.send', {
-        sessionKey: 'web:local',
+        sessionKey: activeSessionKey.value,
         message: text,
       })
       sendStatus.value = 'Sent'
@@ -131,7 +140,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
   }
 
   async function resetActiveConversation() {
-    const sessionKey = activeRun.value?.sessionKey || 'web:local'
+    const sessionKey = activeSessionKey.value
     await connect()
     await gateway.send('sessions.reset', { sessionKey })
     runs.value = runs.value.filter((run) => run.sessionKey !== sessionKey)
@@ -163,6 +172,12 @@ export const useRuntimeStore = defineStore('runtime', () => {
 
     if (event.type === 'runtime.channel.inbound') {
       run.channel = String(event.data?.channel || run.channel || '')
+      run.accountId = String(event.data?.accountId || run.accountId || '')
+      run.workspaceId = String(event.data?.workspaceId || run.workspaceId || '')
+      run.userId = String(event.data?.senderId || run.userId || '')
+      run.conversationId = String(event.data?.conversationId || run.conversationId || '')
+      run.threadId = String(event.data?.threadId || run.threadId || '')
+      run.traceId = String(event.data?.traceId || event.runId || run.traceId || '')
       run.input = String(event.data?.message || event.detail || '')
       run.title = run.input || run.title
     }
@@ -171,6 +186,9 @@ export const useRuntimeStore = defineStore('runtime', () => {
       run.channel = String(event.data?.channel || run.channel || '')
       run.provider = String(event.data?.provider || '')
       run.model = String(event.data?.model || '')
+      run.userId = String(event.data?.senderId || run.userId || '')
+      run.conversationId = String(event.data?.conversationId || run.conversationId || '')
+      run.traceId = String(event.runId || run.traceId || '')
       run.status = 'active'
       run.layerStatus.gateway = 'done'
       // 入站事件可能先于 run id 到达，需要把 pending 事件合并到真实 run 上。
@@ -182,6 +200,10 @@ export const useRuntimeStore = defineStore('runtime', () => {
       run.initialMessages = messages
       run.currentMessages = messages
       run.layerStatus.runtime = 'active'
+    }
+
+    if (event.type === 'runtime.session.loaded') {
+      run.sessionId = String(event.data?.sessionId || '')
     }
 
     if (event.type === 'runtime.model.delta') {
@@ -211,6 +233,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
         tool.status = event.status
         tool.result = result
         tool.finishedAt = event.ts
+        tool.durationMs = Number(event.data?.durationMs || 0) || undefined
       } else {
         run.tools.push({
           id: `${event.ts}-${name}`,
@@ -218,6 +241,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
           status: event.status,
           result,
           finishedAt: event.ts,
+          durationMs: Number(event.data?.durationMs || 0) || undefined,
         })
       }
       const preferredReply = replyTextFromToolResult(result)
@@ -234,6 +258,8 @@ export const useRuntimeStore = defineStore('runtime', () => {
     if (event.type === 'runtime.run.completed') {
       run.status = event.status
       run.output = String(event.data?.responseText || run.output)
+      run.runtimeMs = Number(event.data?.runtimeMs || 0) || undefined
+      run.error = event.status === 'failed' ? String(event.detail || run.output || '') : undefined
       const messages = getMessages(event.data)
       if (messages.length) run.currentMessages = messages
       run.layerStatus.runtime = event.status
@@ -253,6 +279,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     }
 
     activeRunId.value = run.id
+    activeSessionKey.value = run.sessionKey
     // 最新运行保持在最上方，同时限制最多 50 条，避免长时间打开页面后内存膨胀。
     runs.value = [run, ...runs.value.filter((item) => item.id !== run.id)].slice(0, 50)
   }
@@ -310,12 +337,37 @@ export const useRuntimeStore = defineStore('runtime', () => {
     run.events = [...pending.events, ...run.events]
     run.input = run.input || pending.input
     run.title = run.input || run.title
+    run.channel = run.channel || pending.channel
+    run.accountId = run.accountId || pending.accountId
+    run.workspaceId = run.workspaceId || pending.workspaceId
+    run.userId = run.userId || pending.userId
+    run.conversationId = run.conversationId || pending.conversationId
+    run.threadId = run.threadId || pending.threadId
+    run.traceId = run.traceId || pending.traceId
     run.layerStatus.channel = pending.layerStatus.channel
     runs.value = runs.value.filter((item) => item.id !== pendingId)
   }
 
   function selectRun(id: string) {
     activeRunId.value = id
+    const run = runs.value.find((item) => item.id === id)
+    if (run) activeSessionKey.value = run.sessionKey
+  }
+
+  function selectSession(key: string) {
+    activeSessionKey.value = key
+    const run = runs.value.find((item) => item.sessionKey === key)
+    activeRunId.value = run?.id || ''
+  }
+
+  async function createConversation() {
+    await connect()
+    const key = `web:local:${Date.now().toString(36)}`
+    await gateway.send('sessions.create', { sessionKey: key, label: 'WebChat conversation' })
+    activeSessionKey.value = key
+    activeRunId.value = ''
+    sendStatus.value = 'New conversation ready'
+    await loadSnapshot()
   }
 
   return {
@@ -323,7 +375,9 @@ export const useRuntimeStore = defineStore('runtime', () => {
     sendStatus,
     runs,
     activeRunId,
+    activeSessionKey,
     activeRun,
+    selectedSession,
     activeEvents,
     activeMessages,
     sessions,
@@ -335,5 +389,7 @@ export const useRuntimeStore = defineStore('runtime', () => {
     sendLocalMessage,
     resetActiveConversation,
     selectRun,
+    selectSession,
+    createConversation,
   }
 })

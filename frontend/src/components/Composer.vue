@@ -7,7 +7,7 @@
       placeholder="Send a message through local WebChat"
     ></textarea>
     <div class="composer-actions">
-      <span>{{ runtime.sendStatus || 'web:local' }}</span>
+      <span>{{ runtime.sendStatus || runtime.activeSessionKey }}</span>
       <button :disabled="!runtime.draft.trim()">Send</button>
     </div>
   </form>

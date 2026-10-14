@@ -11,7 +11,11 @@
 | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | With Slack | Slack credentials |
 | `MUXTRAIL_DISCORD_ENABLED` | No | Enable Discord Gateway |
 | `DISCORD_BOT_TOKEN` | With Discord | Discord bot credential |
+| `MUXTRAIL_DISCORD_MESSAGE_CONTENT_ENABLED` | No | Defaults to `false`; opt into the privileged Message Content Gateway intent only when the same toggle is enabled for the bot in Discord's Developer Portal |
 | `MUXTRAIL_FEISHU_ENABLED` | No | Enable optional Feishu |
 | `FEISHU_APP_ID`, `FEISHU_APP_SECRET` | With Feishu | Feishu credentials |
 
 WebChat starts without optional channel credentials. Use `.env.example` as the authoritative list.
+The Discord code flag and Developer Portal toggle must remain aligned. Enabling the environment
+flag without enabling the privileged intent for the bot can cause Discord to close the Gateway
+connection with code `4014`.

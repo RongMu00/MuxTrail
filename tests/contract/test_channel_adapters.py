@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
-from muxtrail.channels.discord.plugin import DiscordChannelPlugin
+from muxtrail.channels.discord.plugin import (
+    DEFAULT_INTENTS,
+    MESSAGE_CONTENT_INTENT,
+    DiscordChannelPlugin,
+    gateway_intents,
+)
 from muxtrail.channels.routing import resolve_session_key
 from muxtrail.channels.slack.plugin import SlackChannelPlugin
 from muxtrail.contracts.channel.plugin import InboundMessage, OutboundMessage
@@ -105,6 +111,37 @@ async def test_discord_mocked_inbound_and_reply(monkeypatch: pytest.MonkeyPatch)
     assert received[0].workspace_id == "G1"
     assert calls[0]["message_reference"]["message_id"] == "M1"
     assert delivery.ok is True
+
+
+def test_discord_gateway_intents_default_to_least_privilege(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MUXTRAIL_DISCORD_MESSAGE_CONTENT_ENABLED", raising=False)
+
+    assert DEFAULT_INTENTS == 1 | 512 | 4096
+    assert gateway_intents() == DEFAULT_INTENTS
+    assert gateway_intents() & MESSAGE_CONTENT_INTENT == 0
+
+
+@pytest.mark.asyncio
+async def test_discord_identify_opts_into_message_content_intent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent: list[dict[str, Any]] = []
+
+    class Socket:
+        async def send(self, raw: str) -> None:
+            sent.append(json.loads(raw))
+
+    monkeypatch.setenv("MUXTRAIL_DISCORD_MESSAGE_CONTENT_ENABLED", "true")
+    plugin = DiscordChannelPlugin()
+    plugin._bot_token = "discord-test"
+
+    await plugin._identify_or_resume(Socket())
+
+    assert gateway_intents() == DEFAULT_INTENTS | MESSAGE_CONTENT_INTENT
+    assert sent[0]["op"] == 2
+    assert sent[0]["d"]["intents"] == DEFAULT_INTENTS | MESSAGE_CONTENT_INTENT
 
 
 def test_session_keys_isolate_channel_workspace_thread_and_user() -> None:

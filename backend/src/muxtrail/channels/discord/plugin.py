@@ -28,9 +28,18 @@ if TYPE_CHECKING:
 log = get_logger("channel.discord")
 DISCORD_API = "https://discord.com/api/v10"
 GATEWAY_VERSION = 10
-INTENTS = 1 | 512 | 4096  # guilds, guild messages, direct messages; no privileged intents
+DEFAULT_INTENTS = 1 | 512 | 4096  # guilds, guild messages, direct messages
+MESSAGE_CONTENT_INTENT = 1 << 15
 MAX_DISCORD_TEXT = 2_000
 DEDUPE_TTL_SECONDS = 600.0
+
+
+def gateway_intents() -> int:
+    """Return the least-privilege Gateway intent mask for this process."""
+    message_content_enabled = os.environ.get(
+        "MUXTRAIL_DISCORD_MESSAGE_CONTENT_ENABLED", ""
+    ).lower() in {"1", "true", "yes", "on"}
+    return DEFAULT_INTENTS | (MESSAGE_CONTENT_INTENT if message_content_enabled else 0)
 
 
 class DiscordChannelPlugin:
@@ -192,7 +201,7 @@ class DiscordChannelPlugin:
                 "op": 2,
                 "d": {
                     "token": self._bot_token,
-                    "intents": INTENTS,
+                    "intents": gateway_intents(),
                     "properties": {
                         "os": "linux",
                         "browser": "muxtrail",

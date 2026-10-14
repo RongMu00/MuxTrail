@@ -4,8 +4,11 @@
   unsupported-model, timeout, and server failures are reported as distinct safe errors.
 - **Slack does not connect:** verify both token types, Socket Mode, scopes, subscriptions, and app
   installation. `xapp-` and `xoxb-` tokens are different.
-- **Discord sees no server text:** mention the bot. MuxTrail intentionally avoids the privileged
-  Message Content intent.
+- **Discord sees no server text:** mention the bot first. MuxTrail avoids the privileged Message
+  Content intent by default because Discord documents content access for DMs and explicit app
+  mentions. If server events still arrive with empty `content` and `mentions`, follow the opt-in
+  workaround in [Discord Gateway setup](discord-setup.md): enable Message Content Intent in the
+  Developer Portal, set `MUXTRAIL_DISCORD_MESSAGE_CONTENT_ENABLED=true`, and restart MuxTrail.
 - **Search returns zero results:** inspect filters and retry with broader terms. Zero results are not
   proof that information is absent.
 - **Fetch blocked:** the destination may resolve to a private address, redirect unsafely, return a

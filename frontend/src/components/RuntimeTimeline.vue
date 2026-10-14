@@ -52,7 +52,11 @@
             <strong>{{ eventTitle(event) }}</strong>
             <time>{{ formatTime(event.ts) }}</time>
           </div>
-          <p v-if="eventDetail(event)">{{ eventDetail(event) }}</p>
+          <SafeMarkdown
+            v-if="eventDetail(event)"
+            class="event-detail"
+            :text="eventDetail(event)"
+          />
         </div>
       </article>
     </div>
@@ -217,6 +221,9 @@ h3 {
   border: 1px solid var(--border);
   background: #fff;
   padding: 11px 12px;
+  color: #111827;
+  font-size: 13px;
+  line-height: 1.65;
 }
 .bubble.user {
   border-left: 3px solid var(--text);
@@ -292,10 +299,12 @@ h3 {
 }
 .bubble p {
   margin: 0;
-  color: #111827;
-  font-size: 13px;
-  line-height: 1.65;
   white-space: pre-wrap;
+}
+.bubble :deep(.safe-markdown) {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 .event-row {
   display: grid;
@@ -338,13 +347,15 @@ h3 {
   color: var(--muted);
   font: 600 10px/1 var(--mono);
 }
-p {
+.event-detail {
   margin-top: 6px;
   color: #4b5563;
   font-size: 12px;
   line-height: 1.55;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.event-detail :deep(p) {
+  margin: 0;
 }
 .empty {
   padding: 20px;

@@ -51,6 +51,7 @@ class DiscordChannelPlugin:
         self._on_inbound = on_inbound
         self._bot_token = ""
         self._bot_user_id = ""
+        self._bot_role_ids: set[str] = set()
         self._task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
@@ -221,6 +222,19 @@ class DiscordChannelPlugin:
             user = data.get("user") or {}
             self._bot_user_id = str(user.get("id") or self._bot_user_id)
             return True
+        if event_type == "GUILD_CREATE":
+            raw_roles = data.get("roles")
+            roles: list[Any] = raw_roles if isinstance(raw_roles, list) else []
+            for role in roles:
+                if not isinstance(role, dict):
+                    continue
+                tags = role.get("tags")
+                if not isinstance(tags, dict):
+                    continue
+                role_id = str(role.get("id") or "")
+                if role_id and str(tags.get("bot_id") or "") == self._bot_user_id:
+                    self._bot_role_ids.add(role_id)
+            return True
         if event_type != "MESSAGE_CREATE":
             return False
         author = data.get("author") or {}
@@ -239,7 +253,10 @@ class DiscordChannelPlugin:
             for item in mentions
             if isinstance(item, dict)
         )
-        if not is_dm and not mentioned:
+        raw_role_mentions = data.get("mention_roles")
+        role_mentions = raw_role_mentions if isinstance(raw_role_mentions, list) else []
+        matched_role_ids = {str(role_id) for role_id in role_mentions} & self._bot_role_ids
+        if not is_dm and not mentioned and not matched_role_ids:
             return False
         text = str(data.get("content") or "")
         text = (
@@ -247,6 +264,8 @@ class DiscordChannelPlugin:
             .replace(f"<@!{self._bot_user_id}>", "")
             .strip()
         )
+        for role_id in matched_role_ids:
+            text = text.replace(f"<@&{role_id}>", "").strip()
         if not text:
             return False
         if message_id:

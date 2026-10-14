@@ -4,7 +4,8 @@
   unsupported-model, timeout, and server failures are reported as distinct safe errors.
 - **Slack does not connect:** verify both token types, Socket Mode, scopes, subscriptions, and app
   installation. `xapp-` and `xoxb-` tokens are different.
-- **Discord sees no server text:** mention the bot first. MuxTrail avoids the privileged Message
+- **Discord sees no server text:** mention the bot member or its Discord-managed bot role first;
+  both encodings are supported, while unrelated role mentions are ignored. MuxTrail avoids the privileged Message
   Content intent by default because Discord documents content access for DMs and explicit app
   mentions. If server events still arrive with empty `content` and `mentions`, follow the opt-in
   workaround in [Discord Gateway setup](discord-setup.md): enable Message Content Intent in the

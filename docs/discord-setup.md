@@ -10,11 +10,12 @@
 5. Install the generated URL into a test server.
 6. Set `MUXTRAIL_DISCORD_ENABLED=true` and restart MuxTrail.
 
-DMs are processed directly. Server messages must mention `@MuxTrail`. Gateway events are
-deduplicated and self/bot messages are ignored. Replies use REST, preserve a message reference on
-the first chunk, and split text at Discord's 2,000-character limit. Heartbeats, reconnect, and
-session resume are handled by the adapter. Session identity includes server, channel/thread, and
-user.
+DMs are processed directly. Server messages may mention either the MuxTrail bot member or its
+Discord-managed bot role; MuxTrail discovers only roles tagged as managed by its own bot account.
+Unrelated role mentions do not trigger a run. Gateway events are deduplicated and self/bot messages
+are ignored. Replies use REST, preserve a message reference on the first chunk, and split text at
+Discord's 2,000-character limit. Heartbeats, reconnect, and session resume are handled by the
+adapter. Session identity includes server, channel/thread, and user.
 
 If your Discord environment delivers server events with both `content` and `mentions` empty,
 enable **Message Content Intent** under **Privileged Gateway Intents** in the Developer Portal,

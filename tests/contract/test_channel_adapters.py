@@ -113,6 +113,58 @@ async def test_discord_mocked_inbound_and_reply(monkeypatch: pytest.MonkeyPatch)
     assert delivery.ok is True
 
 
+@pytest.mark.asyncio
+async def test_discord_caches_only_roles_managed_by_current_bot() -> None:
+    plugin = DiscordChannelPlugin()
+    plugin._bot_user_id = "B1"
+
+    handled = await plugin.handle_dispatch(
+        "default",
+        "GUILD_CREATE",
+        {
+            "id": "G1",
+            "roles": [
+                {"id": "R-bot", "tags": {"bot_id": "B1"}},
+                {"id": "R-other", "tags": {"bot_id": "B2"}},
+                {"id": "R-plain", "tags": None},
+                "malformed",
+            ],
+        },
+    )
+
+    assert handled is True
+    assert plugin._bot_role_ids == {"R-bot"}
+
+
+@pytest.mark.asyncio
+async def test_discord_unrelated_role_mention_does_not_trigger_inbound() -> None:
+    received: list[InboundMessage] = []
+
+    async def on_inbound(message: InboundMessage) -> None:
+        received.append(message)
+
+    plugin = DiscordChannelPlugin(on_inbound)
+    plugin._bot_user_id = "B1"
+    plugin._bot_role_ids.add("R-bot")
+
+    handled = await plugin.handle_dispatch(
+        "default",
+        "MESSAGE_CREATE",
+        {
+            "id": "M-role-other",
+            "guild_id": "G1",
+            "channel_id": "C1",
+            "author": {"id": "U1", "bot": False},
+            "mentions": [],
+            "mention_roles": ["R-other"],
+            "content": "<@&R-other> should be ignored",
+        },
+    )
+
+    assert handled is False
+    assert received == []
+
+
 def test_discord_gateway_intents_default_to_least_privilege(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -258,6 +310,11 @@ async def test_discord_adapter_round_trip_uses_gateway_runtime_and_originating_s
         return {"id": "M2"}
 
     monkeypatch.setattr(plugin, "_rest", fake_rest)
+    guild_handled = await plugin.handle_dispatch(
+        "default",
+        "GUILD_CREATE",
+        {"id": "G1", "roles": [{"id": "R-bot", "tags": {"bot_id": "B1"}}]},
+    )
     handled = await plugin.handle_dispatch(
         "default",
         "MESSAGE_CREATE",
@@ -266,11 +323,13 @@ async def test_discord_adapter_round_trip_uses_gateway_runtime_and_originating_s
             "guild_id": "G1",
             "channel_id": "C1",
             "author": {"id": "U1", "bot": False},
-            "mentions": [{"id": "B1"}],
-            "content": "<@B1> hello gateway",
+            "mentions": [],
+            "mention_roles": ["R-bot"],
+            "content": "<@&R-bot> hello gateway",
         },
     )
 
+    assert guild_handled is True
     assert handled is True
     assert calls[0][0:2] == ("POST", "/channels/C1/messages")
     assert calls[0][2]["content"] == "gateway reply"

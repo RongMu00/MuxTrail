@@ -30,11 +30,11 @@
 
       <article class="bubble assistant">
         <div class="bubble-label">Final response (streaming)</div>
-        <p>{{ runtime.activeRun.output || 'Waiting for model output.' }}</p>
+        <SafeMarkdown :text="runtime.activeRun.output || 'Waiting for model output.'" />
       </article>
       <article v-if="runtime.activeRun.replyText" class="bubble reply">
         <div class="bubble-label">Channel delivery</div>
-        <p>{{ runtime.activeRun.replyText }}</p>
+        <SafeMarkdown :text="runtime.activeRun.replyText" />
       </article>
     </div>
 
@@ -63,6 +63,7 @@
 
 <script setup lang="ts">
 import { useRuntimeStore } from '@/stores/runtime'
+import SafeMarkdown from '@/components/SafeMarkdown.vue'
 import type { RuntimeEventPayload, RuntimeStatus } from '@/api/types'
 
 const runtime = useRuntimeStore()
@@ -80,7 +81,7 @@ function eventTitle(event: RuntimeEventPayload) {
     'runtime.model.streaming': 'Model output',
     'runtime.usage': 'Token usage',
     'runtime.tool.started': 'Tool started',
-    'runtime.tool.finished': 'Tool finished',
+    'runtime.tool.finished': event.status === 'failed' ? 'Tool failed' : 'Tool finished',
     'runtime.run.completed': 'Run complete',
     'runtime.run.failed': 'Run failed',
     'runtime.channel.reply_sent': 'Reply delivered',
@@ -142,6 +143,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 function toolBrief(result: unknown, params: unknown) {
   const parsed = asRecord(parseJsonish(result))
   if (parsed) {
+    if (parsed.ok === false || parsed.error) {
+      const status = typeof parsed.status === 'number' ? `HTTP ${parsed.status}` : 'Tool failed'
+      const error = typeof parsed.error === 'string' ? parsed.error.replace(/^Fetch failed:\s*/i, '') : ''
+      return error && error.toLowerCase() !== status.toLowerCase()
+        ? `${status} — ${error}`
+        : status
+    }
     const title = typeof parsed.title === 'string' ? ` “${parsed.title}”` : ''
     const blocks = typeof parsed.blocks_created === 'number' ? ` with ${parsed.blocks_created} blocks` : ''
     const reply = typeof parsed.reply_text === 'string' ? parsed.reply_text.split('\n')[0] : ''

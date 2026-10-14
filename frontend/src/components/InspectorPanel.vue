@@ -19,7 +19,9 @@
         <span>Final response / visible output</span>
         <strong>{{ runtime.activeRun?.output.length || 0 }}</strong>
       </div>
-      <pre>{{ runtime.activeRun?.output || 'No model output yet.' }}</pre>
+      <div class="rendered-output">
+        <SafeMarkdown :text="runtime.activeRun?.output || 'No model output yet.'" />
+      </div>
     </div>
 
     <ToolCallPanel />
@@ -30,6 +32,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import MessageContextPanel from '@/components/MessageContextPanel.vue'
+import SafeMarkdown from '@/components/SafeMarkdown.vue'
 import ToolCallPanel from '@/components/ToolCallPanel.vue'
 import { useRuntimeStore } from '@/stores/runtime'
 
@@ -126,10 +129,9 @@ h2 {
   font: 700 10px/1 var(--mono);
   border-bottom: 1px solid var(--border);
 }
-pre {
+.rendered-output {
   margin: 0;
   padding: 14px;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: 500 12px/1.6 var(--mono);
   color: #111827;

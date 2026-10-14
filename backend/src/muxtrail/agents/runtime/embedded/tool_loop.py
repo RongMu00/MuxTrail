@@ -73,7 +73,13 @@ async def run_tool_loop(
             else:
                 output_str = json.dumps(result.output, ensure_ascii=False, default=str)
         else:
-            output_str = f"Error: {result.error}"
+            if result.output is not None:
+                if isinstance(result.output, str):
+                    output_str = result.output
+                else:
+                    output_str = json.dumps(result.output, ensure_ascii=False, default=str)
+            else:
+                output_str = f"Error: {result.error}"
 
         output_str = truncate_result(output_str)
 

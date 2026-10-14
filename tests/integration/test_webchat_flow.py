@@ -10,8 +10,10 @@ from typing import Any
 
 import pytest
 from muxtrail.channels.webchat.plugin import WebChatPlugin
+from muxtrail.contracts.agent.runtime import AgentEvent, AgentEventType
 from muxtrail.contracts.channel.plugin import OutboundMessage
-from muxtrail.gateway.boot import AgentRunResult
+from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
+from muxtrail.gateway.boot import AgentRunResult, GatewayRuntime
 from muxtrail.gateway.methods.sessions import handle_sessions_send
 
 
@@ -78,3 +80,56 @@ async def test_webchat_send_emits_reply_delivery_event() -> None:
         "transport": "gateway-websocket",
     }
     assert frames[-1]["payload"]["type"] == "complete"
+
+
+@pytest.mark.asyncio
+async def test_structured_tool_failure_emits_failed_runtime_event(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MUXTRAIL_STATE_DIR", str(tmp_path))
+    runtime = GatewayRuntime(MuxTrailConfig())
+    runtime.boot()
+    emitted: list[dict[str, Any]] = []
+
+    class FailedToolRuntime:
+        runtime_id = "failed-tool-runtime"
+
+        async def run(self, request: Any, abort_signal: Any):
+            yield AgentEvent(
+                type=AgentEventType.TOOL_CALL_START,
+                tool_name="web_fetch",
+                tool_params={"url": "https://example.com/missing"},
+            )
+            yield AgentEvent(
+                type=AgentEventType.TOOL_CALL_RESULT,
+                tool_name="web_fetch",
+                tool_result=(
+                    '{"ok": false, "status": 404, '
+                    '"error": "Fetch failed: HTTP 404"}'
+                ),
+                metadata={"durationMs": 12, "success": False},
+            )
+            yield AgentEvent(
+                type=AgentEventType.TEXT_DELTA,
+                text="The server returned HTTP 404.",
+            )
+            yield AgentEvent(type=AgentEventType.COMPLETE)
+
+    async def capture(event_type: str, **kwargs: Any) -> None:
+        emitted.append({"type": event_type, **kwargs})
+
+    runtime.runtime_registry.register(FailedToolRuntime(), default=True)
+    monkeypatch.setattr(runtime, "_emit_runtime_event", capture)
+
+    result = await runtime.run_agent_for_session(
+        "web:test-failure",
+        "Open the missing page",
+        channel="webchat",
+    )
+
+    tool_event = next(item for item in emitted if item["type"] == "runtime.tool.finished")
+    assert tool_event["status"] == "failed"
+    assert tool_event["title"] == "Tool failed: web_fetch"
+    assert tool_event["data"]["success"] is False
+    assert "HTTP 404" in str(tool_event["data"]["result"])
+    assert "HTTP 404" in "".join(result.texts)

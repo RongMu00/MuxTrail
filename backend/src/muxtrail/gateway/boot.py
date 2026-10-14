@@ -656,13 +656,18 @@ class GatewayRuntime:
                             "content": str(event.tool_result or ""),
                         }
                     )
+                    tool_succeeded = event.metadata.get("success") is not False
                     await self._emit_runtime_event(
                         "runtime.tool.finished",
                         layer="tools",
                         session_key=session_key,
                         run_id=run_id,
-                        status="done",
-                        title=f"Tool finished: {event.tool_name}",
+                        status="done" if tool_succeeded else "failed",
+                        title=(
+                            f"Tool finished: {event.tool_name}"
+                            if tool_succeeded
+                            else f"Tool failed: {event.tool_name}"
+                        ),
                         detail=str(event.tool_name or ""),
                         data={
                             "tool": event.tool_name,

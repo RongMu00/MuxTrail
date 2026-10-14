@@ -6,6 +6,7 @@
 """Tool execution engine."""
 
 import asyncio
+from collections.abc import Mapping
 from typing import Any
 
 from muxtrail.tools.policy import ToolPolicy
@@ -76,6 +77,15 @@ async def execute_tool(
     try:
         async with asyncio.timeout(DEFAULT_TOOL_TIMEOUT_SECONDS):
             output = await tool.handler(params, context)
+        if isinstance(output, Mapping):
+            raw_error = output.get("error")
+            error = str(raw_error).strip() if raw_error is not None else ""
+            if output.get("ok") is False or error:
+                return ToolResult(
+                    success=False,
+                    output=output,
+                    error=error or f"Tool '{name}' reported failure",
+                )
         return ToolResult(success=True, output=output)
     except TimeoutError:
         return ToolResult(success=False, error=f"Tool '{name}' timed out")

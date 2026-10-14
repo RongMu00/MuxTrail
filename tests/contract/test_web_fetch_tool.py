@@ -12,6 +12,9 @@ from typing import Any
 import httpx
 import pytest
 from muxtrail.tools.builtin.web_fetch import MAX_RESPONSE_BYTES, create_web_fetch_tool, extract_text
+from muxtrail.tools.execution import execute_tool
+from muxtrail.tools.policy import ToolPolicy
+from muxtrail.tools.registry import ToolRegistry
 
 
 @pytest.mark.asyncio
@@ -168,6 +171,32 @@ async def test_web_fetch_stops_stream_when_response_exceeds_byte_cap(httpx_mock:
     assert result["ok"] is False
     assert "byte limit" in result["error"]
     assert stream.chunks_read == 3
+
+
+@pytest.mark.asyncio
+async def test_web_fetch_non_text_response_is_failed_by_execution_layer(httpx_mock: Any) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="https://example.com/archive.zip",
+        headers={"content-type": "application/zip"},
+        content=b"not buffered by the text fetcher",
+    )
+    tool = create_web_fetch_tool()
+    registry = ToolRegistry()
+    registry.register(tool)
+
+    result = await execute_tool(
+        registry,
+        ToolPolicy(),
+        "web_fetch",
+        {"url": "https://example.com/archive.zip"},
+    )
+
+    assert result.success is False
+    assert isinstance(result.output, dict)
+    assert result.output["ok"] is False
+    assert result.output["status"] == 200
+    assert result.error == "Unsupported non-text content type: application/zip"
 
 
 def test_web_fetch_tool_exposes_research_prompt_instruction() -> None:

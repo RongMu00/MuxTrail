@@ -117,6 +117,7 @@ function summaryRows(result: unknown) {
   if (!isRecord(parsed)) return []
   const labels: Record<string, string> = {
     ok: 'Status',
+    status: 'HTTP status',
     provider: 'Provider',
     query: 'Query',
     search_depth: 'Search depth',

@@ -11,7 +11,12 @@
           <span>{{ message.role }}</span>
           <span v-if="message.name">{{ message.name }}</span>
         </div>
-        <pre>{{ formatMessage(message) }}</pre>
+        <SafeMarkdown
+          v-if="message.role === 'assistant' && typeof message.content === 'string'"
+          class="message-markdown"
+          :text="message.content"
+        />
+        <pre v-else>{{ formatMessage(message) }}</pre>
       </article>
     </div>
 
@@ -22,6 +27,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRuntimeStore } from '@/stores/runtime'
+import SafeMarkdown from '@/components/SafeMarkdown.vue'
 import type { RuntimeMessage } from '@/api/types'
 
 const runtime = useRuntimeStore()
@@ -91,6 +97,11 @@ pre {
   color: #111827;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  font: 500 11px/1.55 var(--mono);
+}
+.message-markdown {
+  padding: 10px;
+  color: #111827;
   font: 500 11px/1.55 var(--mono);
 }
 .empty {

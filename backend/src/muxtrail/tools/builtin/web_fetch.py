@@ -42,7 +42,9 @@ WEB_FETCH_PROMPT_INSTRUCTIONS = (
     "links as evidence. If the fetched page is unavailable, paywalled, blocked, or only a "
     "secondary summary, say that limitation clearly in the final document. If ok is false, "
     "treat the fetch as failed, do not use the page as evidence, and do not guess facts that "
-    "the page was meant to verify. Do not invent citations or leave placeholders."
+    "the page was meant to verify. For HTTP errors, report exactly that the server returned "
+    "the status code; do not infer that a resource permanently does not exist. Do not invent "
+    "citations or leave placeholders."
 )
 
 
@@ -338,6 +340,7 @@ async def _handler(params: dict[str, Any], context: Any = None) -> dict[str, Any
         # 这个工具只负责文本网页读取，二进制下载需要单独的文件沙箱设计。
         result.update(
             {
+                "ok": False,
                 "content": "",
                 "text": "",
                 "truncated": False,

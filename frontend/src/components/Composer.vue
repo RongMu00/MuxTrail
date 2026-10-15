@@ -4,11 +4,12 @@
       v-model="runtime.draft"
       rows="3"
       aria-label="Message MuxTrail through local WebChat"
-      placeholder="Send a message through local WebChat"
+      :maxlength="runtime.demoMode ? runtime.demoMaxMessageChars : undefined"
+      :placeholder="runtime.demoMode ? 'Ask the restricted public demo' : 'Send a message through local WebChat'"
     ></textarea>
     <div class="composer-actions">
       <span>{{ runtime.sendStatus || runtime.activeSessionKey }}</span>
-      <button :disabled="!runtime.draft.trim()">Send</button>
+      <button :disabled="!runtime.draft.trim() || runtime.sendStatus === 'Sending'">Send</button>
     </div>
   </form>
 </template>

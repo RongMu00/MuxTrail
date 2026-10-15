@@ -3,11 +3,11 @@
     <div class="panel-head">
       <div>
         <p class="eyebrow">Runs</p>
-        <h2>Live sessions</h2>
+        <h2>{{ runtime.demoMode ? 'Public demo' : 'Live sessions' }}</h2>
       </div>
       <div class="panel-actions">
         <button class="ghost-btn" @click="runtime.createConversation">New</button>
-        <button class="ghost-btn" @click="runtime.loadSnapshot">Refresh</button>
+        <button v-if="!runtime.demoMode" class="ghost-btn" @click="runtime.loadSnapshot">Refresh</button>
         <button class="ghost-btn" @click="runtime.resetActiveConversation">Reset</button>
       </div>
     </div>
@@ -23,8 +23,8 @@
       </div>
     </div>
 
-    <div class="section-label">Conversations</div>
-    <div class="runs sessions">
+    <div v-if="!runtime.demoMode" class="section-label">Conversations</div>
+    <div v-if="!runtime.demoMode" class="runs sessions">
       <button
         v-for="session in runtime.sessions"
         :key="session.key"
@@ -39,7 +39,12 @@
         <span class="run-time">{{ formatTime(session.updatedAt) }}</span>
       </button>
     </div>
-    <div v-if="!runtime.sessions.length" class="empty">No saved conversations yet.</div>
+    <div v-if="!runtime.demoMode && !runtime.sessions.length" class="empty">No saved conversations yet.</div>
+
+    <div v-if="runtime.demoMode" class="demo-notice">
+      Temporary session · {{ runtime.demoMaxTurns }} turns · web-only tools · no file, shell, or
+      messaging access. Runs may be observed by the owner; do not enter sensitive information.
+    </div>
 
     <div class="section-label">Execution runs</div>
     <div class="runs">
@@ -228,5 +233,13 @@ h2 {
   padding: 20px;
   color: var(--muted);
   font-size: 13px;
+}
+.demo-notice {
+  margin: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  font: 600 11px/1.55 var(--mono);
 }
 </style>

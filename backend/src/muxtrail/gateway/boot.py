@@ -442,6 +442,7 @@ class GatewayRuntime:
         trace_id: str | None = None,
         system_prompt: str = DEFAULT_MUXTRAIL_IDENTITY,
         on_text_delta: Any = None,
+        tool_profile: str | None = None,
     ) -> AgentRunResult:
         """为指定 session 执行一次 agent run。
 
@@ -539,7 +540,7 @@ class GatewayRuntime:
 
         # 飞书等远程消息入口使用更保守的 messaging 工具集；本地入口可使用完整工具集。
         # 这里是安全边界之一：远程聊天入口默认不应该拥有 shell、文件写入等高风险本地能力。
-        tool_profile = "messaging" if channel else "full"
+        tool_profile = tool_profile or ("messaging" if channel else "full")
         effective_system_prompt = build_system_prompt(
             identity=system_prompt,
             tool_instructions=_tool_prompt_instructions(self.tool_registry, tool_profile),

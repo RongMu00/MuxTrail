@@ -10,7 +10,11 @@ export interface GatewayFrame {
   seq?: number
 }
 
-function defaultGatewayUrl() {
+export const ownerMode = new URLSearchParams(location.search).get('owner') === '1'
+export const demoMode = Boolean(import.meta.env.VITE_MUXTRAIL_DEMO_WS_URL) && !ownerMode
+
+export function defaultGatewayUrl() {
+  if (demoMode) return import.meta.env.VITE_MUXTRAIL_DEMO_WS_URL
   const configured = import.meta.env.VITE_MUXTRAIL_WS_URL
   if (configured) return configured
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -41,7 +45,12 @@ export class GatewayClient {
         this.emitStatus('handshake')
         this.send('connect', {
           minProtocol: 1, maxProtocol: 3,
-          client: { id: 'web-admin', version: '0.1.0', platform: 'browser', mode: 'local' }
+          client: {
+            id: demoMode ? 'public-demo' : 'web-admin',
+            version: '0.1.0',
+            platform: 'browser',
+            mode: demoMode ? 'demo' : 'local',
+          }
         }).then((payload) => {
           this.emitStatus('connected')
           this.reconnectAttempt = 0
@@ -100,7 +109,9 @@ export class GatewayClient {
       const p = this.pending.get(frame.id)
       if (p) {
         this.pending.delete(frame.id)
-        frame.ok ? p.resolve(frame.payload) : p.reject(frame.error)
+        frame.ok
+          ? p.resolve(frame.payload)
+          : p.reject(new Error(frame.error?.message || 'Gateway request failed'))
       }
     } else if (frame.type === 'event' && frame.event) {
       const handlers = this.eventHandlers.get(frame.event) || []

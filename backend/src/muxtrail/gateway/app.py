@@ -13,11 +13,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi.responses import JSONResponse
 
 from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
 from muxtrail.core.logging import get_logger
 from muxtrail.core.redaction import redact
 from muxtrail.gateway.boot import GatewayRuntime
+from muxtrail.gateway.demo import DemoGate, demo_enabled, handle_demo_websocket
 from muxtrail.gateway.http.health import router as health_router
 from muxtrail.gateway.http.security import resolve_allowed_origins, setup_security
 from muxtrail.gateway.methods.agent import handle_agent, handle_agent_wait
@@ -105,13 +107,25 @@ def create_app(config: MuxTrailConfig | None = None, boot: bool = True) -> FastA
     app = FastAPI(title="MuxTrail Gateway", version="0.1.0", lifespan=lifespan)
     state = GatewayRuntimeState(config=config)
     method_registry = create_method_registry()
+    demo_gate = DemoGate()
 
     app.state.gateway_state = state
     app.state.method_registry = method_registry
     allowed_origins = resolve_allowed_origins(config)
+    demo_public_host = os.environ.get("MUXTRAIL_DEMO_PUBLIC_HOST", "demo-api.muxtrail.com").lower()
 
     # HTTP routes
     setup_security(app, allowed_origins)
+
+    @app.middleware("http")
+    async def isolate_public_demo_host(request: Request, call_next: Any) -> Any:
+        # A tunnel hostname routes every path to this ASGI app. Deny the entire
+        # HTTP control plane on the public demo hostname; its only valid entry
+        # point is the separately handled /demo/ws WebSocket upgrade.
+        if request.url.hostname and request.url.hostname.lower() == demo_public_host:
+            return JSONResponse({"detail": "not found"}, status_code=404)
+        return await call_next(request)
+
     app.include_router(health_router)
 
     @app.get("/api/config")
@@ -212,10 +226,24 @@ def create_app(config: MuxTrailConfig | None = None, boot: bool = True) -> FastA
     # WebSocket endpoint
     @app.websocket("/ws")
     async def websocket_endpoint(ws: WebSocket) -> None:
+        if ws.url.hostname and ws.url.hostname.lower() == demo_public_host:
+            await ws.close(code=1008, reason="owner websocket is not available on demo host")
+            return
         origin = ws.headers.get("origin")
         if origin and origin.rstrip("/") not in allowed_origins:
             await ws.close(code=1008, reason="origin not allowed")
             return
         await handle_websocket(ws, state, method_registry.as_dict())
+
+    @app.websocket("/demo/ws")
+    async def demo_websocket_endpoint(ws: WebSocket) -> None:
+        if not demo_enabled():
+            await ws.close(code=1008, reason="public demo is disabled")
+            return
+        origin = ws.headers.get("origin")
+        if origin and origin.rstrip("/") not in allowed_origins:
+            await ws.close(code=1008, reason="origin not allowed")
+            return
+        await handle_demo_websocket(ws, state, demo_gate)
 
     return app

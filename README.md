@@ -128,6 +128,7 @@ See [Security and privacy](docs/security.md).
 
 - [Environment variables](docs/environment.md)
 - [Production deployment](docs/production-deployment.md)
+- [Restricted public demo](docs/public-demo.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Demo script](docs/demo.md)
 - [Roadmap](docs/roadmap.md)

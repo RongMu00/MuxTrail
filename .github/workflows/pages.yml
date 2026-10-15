@@ -51,6 +51,8 @@ jobs:
         env:
           VITE_MUXTRAIL_API_BASE: https://api.muxtrail.com/api
           VITE_MUXTRAIL_WS_URL: wss://api.muxtrail.com/ws
+          # Leave PUBLIC_DEMO_WS_URL unset until the backend hostname and limits are ready.
+          VITE_MUXTRAIL_DEMO_WS_URL: ${{ vars.PUBLIC_DEMO_WS_URL }}
           VITE_MUXTRAIL_ACCESS_LOGIN_URL: https://api.muxtrail.com/api/status
         run: pnpm build
 

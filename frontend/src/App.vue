@@ -7,7 +7,12 @@
       </div>
       <div class="top-metrics">
         <a
-          v-if="accessLoginUrl && runtime.wsStatus !== 'connected'"
+          v-if="runtime.demoMode"
+          class="access-link"
+          href="?owner=1"
+        >Owner mode</a>
+        <a
+          v-else-if="accessLoginUrl && runtime.wsStatus !== 'connected'"
           class="access-link"
           :href="accessLoginUrl"
           target="_blank"
@@ -40,11 +45,12 @@ import Composer from '@/components/Composer.vue'
 import InspectorPanel from '@/components/InspectorPanel.vue'
 import RunList from '@/components/RunList.vue'
 import RuntimeTimeline from '@/components/RuntimeTimeline.vue'
+import { defaultGatewayUrl } from '@/api/gateway'
 import { useRuntimeStore } from '@/stores/runtime'
 
 const runtime = useRuntimeStore()
 const accessLoginUrl = import.meta.env.VITE_MUXTRAIL_ACCESS_LOGIN_URL || ''
-const gatewayUrl = import.meta.env.VITE_MUXTRAIL_WS_URL || `ws://${location.host}/ws`
+const gatewayUrl = defaultGatewayUrl()
 const gatewayLabel = new URL(gatewayUrl).host
 const workbenchLabel = location.host
 

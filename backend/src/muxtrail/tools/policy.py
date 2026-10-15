@@ -6,6 +6,13 @@
 """Tool policy — profile-based access control."""
 
 PROFILES: dict[str, dict[str, list[str] | None]] = {
+    # Public demo traffic must never inherit filesystem, shell, messaging, or
+    # session-management capabilities. These two tools are read-only and the
+    # fetch implementation rejects private and loopback destinations.
+    "demo": {
+        "allow": ["web_search", "web_fetch"],
+        "deny": None,
+    },
     "minimal": {
         "allow": ["read_file", "glob", "grep", "web_search", "web_fetch"],
         "deny": None,

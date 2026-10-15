@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/http'
-import { gateway } from '@/api/gateway'
+import { demoMode, gateway } from '@/api/gateway'
 import type {
   ChannelStatus,
   LayerId,
@@ -82,6 +82,8 @@ export const useRuntimeStore = defineStore('runtime', () => {
   const models = ref<ModelInfo[]>([])
   const draft = ref('')
   const connectedOnce = ref(false)
+  const demoMaxTurns = ref(5)
+  const demoMaxMessageChars = ref(1000)
 
   const activeRun = computed(() => runs.value.find((run) => run.id === activeRunId.value))
   const selectedSession = computed(() =>
@@ -101,11 +103,20 @@ export const useRuntimeStore = defineStore('runtime', () => {
     })
     gateway.on('runtime.event', handleRuntimeEvent)
     gateway.on('agent.event', handleAgentEvent)
-    await gateway.connect()
+    const hello = await gateway.connect()
+    if (demoMode && hello?.demo?.sessionKey) {
+      activeSessionKey.value = String(hello.demo.sessionKey)
+      demoMaxTurns.value = Number(hello.demo.maxTurns || 5)
+      demoMaxMessageChars.value = Number(hello.demo.maxMessageChars || 1000)
+    }
     connectedOnce.value = true
   }
 
   async function loadSnapshot() {
+    if (demoMode) {
+      channels.value = [{ channel: 'public-demo', label: 'Public Demo', chatTypes: ['web'] }]
+      return
+    }
     const [sessionData, channelData, modelData] = await Promise.allSettled([
       api.getSessions(),
       api.getChannelStatus(),
@@ -128,11 +139,13 @@ export const useRuntimeStore = defineStore('runtime', () => {
     sendStatus.value = 'Sending'
     draft.value = ''
     try {
-      await gateway.send('sessions.send', {
-        sessionKey: activeSessionKey.value,
-        message: text,
-      })
-      sendStatus.value = 'Sent'
+      const response = await gateway.send(
+        demoMode ? 'demo.send' : 'sessions.send',
+        demoMode ? { message: text } : { sessionKey: activeSessionKey.value, message: text },
+      )
+      sendStatus.value = demoMode
+        ? `Sent · ${Number(response?.turnsRemaining || 0)} turns remaining`
+        : 'Sent'
       await loadSnapshot()
     } catch (error) {
       sendStatus.value = error instanceof Error ? error.message : 'Send failed'
@@ -142,11 +155,11 @@ export const useRuntimeStore = defineStore('runtime', () => {
   async function resetActiveConversation() {
     const sessionKey = activeSessionKey.value
     await connect()
-    await gateway.send('sessions.reset', { sessionKey })
+    await gateway.send(demoMode ? 'demo.reset' : 'sessions.reset', demoMode ? {} : { sessionKey })
     runs.value = runs.value.filter((run) => run.sessionKey !== sessionKey)
     activeRunId.value = ''
     sendStatus.value = 'Conversation reset'
-    await loadSnapshot()
+    if (!demoMode) await loadSnapshot()
   }
 
   function handleAgentEvent(payload: any) {
@@ -361,6 +374,11 @@ export const useRuntimeStore = defineStore('runtime', () => {
   }
 
   async function createConversation() {
+    if (demoMode) {
+      await resetActiveConversation()
+      sendStatus.value = 'New demo conversation ready'
+      return
+    }
     await connect()
     const key = `web:local:${Date.now().toString(36)}`
     await gateway.send('sessions.create', { sessionKey: key, label: 'WebChat conversation' })
@@ -384,6 +402,9 @@ export const useRuntimeStore = defineStore('runtime', () => {
     channels,
     models,
     draft,
+    demoMode,
+    demoMaxTurns,
+    demoMaxMessageChars,
     connect,
     loadSnapshot,
     sendLocalMessage,

@@ -130,23 +130,21 @@ function formatContent(content: string) {
 .message-list {
   padding: 12px;
   min-width: 0;
+  background: #f9fafb;
 }
 .message-row {
   position: relative;
+  z-index: 0;
   min-width: 0;
-  overflow: visible;
+  overflow: clip;
+  contain: layout paint;
+  isolation: isolate;
   border: 1px solid var(--border);
   background: #fff;
-  margin-bottom: 14px;
+  margin: 0;
 }
-.message-row:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  left: 18px;
-  bottom: -15px;
-  width: 1px;
-  height: 14px;
-  background: var(--border);
+.message-row + .message-row {
+  border-top: 0;
 }
 .message-meta {
   display: flex;
@@ -156,10 +154,14 @@ function formatContent(content: string) {
   color: var(--muted);
   font: 700 10px/1 var(--mono);
   text-transform: uppercase;
+  background: #fff;
 }
 .message-body {
+  display: flow-root;
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
+  contain: layout paint;
+  background: #fff;
 }
 .message-body pre {
   display: block;

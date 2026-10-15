@@ -6,24 +6,31 @@
     </div>
 
     <div class="message-list">
-      <article v-for="(message, index) in messages" :key="index" class="message-row">
+      <article v-for="(message, index) in displayMessages" :key="index" class="message-row">
         <div class="message-meta">
           <span>{{ message.role }}</span>
           <span v-if="message.name">{{ message.name }}</span>
         </div>
         <div class="message-body">
           <SafeMarkdown
-            v-if="isMarkdownMessage(message)"
+            v-if="isMarkdownContent(message)"
             class="message-markdown"
             :text="message.content as string"
           />
-          <pre v-else-if="formatMessage(message)">{{ formatMessage(message) }}</pre>
-          <p v-else class="empty-content">No textual content.</p>
+          <pre v-else-if="hasContent(message)">{{ formatContent(String(message.content)) }}</pre>
+          <div
+            v-for="(toolCall, toolIndex) in message.displayToolCalls"
+            :key="toolIndex"
+            class="tool-request"
+          >
+            <span>Requests tool</span>
+            <pre>{{ JSON.stringify(toolCall, null, 2) }}</pre>
+          </div>
         </div>
       </article>
     </div>
 
-    <div v-if="!messages.length" class="empty">No message context yet.</div>
+    <div v-if="!displayMessages.length" class="empty">No message context yet.</div>
   </section>
 </template>
 
@@ -42,19 +49,43 @@ const messages = computed(() => {
   return tab.value === 'initial' ? run.initialMessages : runtime.activeMessages
 })
 
-function formatMessage(message: RuntimeMessage) {
-  if (message.tool_call) return JSON.stringify(message.tool_call, null, 2)
-  if (message.tool_calls) return JSON.stringify(message.tool_calls, null, 2)
-  if (typeof message.content === 'string') return formatContent(message.content)
-  return JSON.stringify(message, null, 2)
-}
+type DisplayMessage = RuntimeMessage & { displayToolCalls: unknown[] }
 
-function isMarkdownMessage(message: RuntimeMessage) {
+const displayMessages = computed(() => collapseAssistantMessages(messages.value))
+
+function isMarkdownContent(message: RuntimeMessage) {
   return message.role === 'assistant'
-    && !message.tool_call
-    && !message.tool_calls
     && typeof message.content === 'string'
     && message.content.trim().length > 0
+}
+
+function hasContent(message: RuntimeMessage) {
+  return typeof message.content === 'string' && message.content.trim().length > 0
+}
+
+function collapseAssistantMessages(source: RuntimeMessage[]): DisplayMessage[] {
+  const result: DisplayMessage[] = []
+  for (const message of source) {
+    const content = typeof message.content === 'string' ? message.content : ''
+    const calls = extractToolCalls(message)
+    const previous = result[result.length - 1]
+    if (message.role === 'assistant' && previous?.role === 'assistant') {
+      previous.content = [String(previous.content || '').trim(), content.trim()]
+        .filter(Boolean)
+        .join('\n\n')
+      previous.displayToolCalls.push(...calls)
+      continue
+    }
+    if (!content.trim() && !calls.length) continue
+    result.push({ ...message, content, displayToolCalls: calls })
+  }
+  return result
+}
+
+function extractToolCalls(message: RuntimeMessage): unknown[] {
+  if (message.tool_call) return [message.tool_call]
+  if (Array.isArray(message.tool_calls)) return message.tool_calls
+  return message.tool_calls ? [message.tool_calls] : []
 }
 
 function formatContent(content: string) {
@@ -101,12 +132,21 @@ function formatContent(content: string) {
   min-width: 0;
 }
 .message-row {
+  position: relative;
   min-width: 0;
-  overflow: hidden;
-  contain: layout paint;
+  overflow: visible;
   border: 1px solid var(--border);
   background: #fff;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
+}
+.message-row:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  bottom: -15px;
+  width: 1px;
+  height: 14px;
+  background: var(--border);
 }
 .message-meta {
   display: flex;
@@ -119,10 +159,7 @@ function formatContent(content: string) {
 }
 .message-body {
   min-width: 0;
-  max-height: 360px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  overflow: hidden;
 }
 .message-body pre {
   display: block;
@@ -144,12 +181,19 @@ function formatContent(content: string) {
   color: #111827;
   font: 500 11px/1.55 var(--mono);
 }
-.empty-content {
-  margin: 0;
-  padding: 10px;
-  color: var(--muted);
-  font: 500 11px/1.55 var(--mono);
-  font-style: italic;
+.tool-request {
+  border-top: 1px solid var(--border);
+  background: #f8fafc;
+}
+.tool-request > span {
+  display: block;
+  padding: 8px 10px 0;
+  color: var(--accent);
+  font: 700 9px/1 var(--mono);
+  text-transform: uppercase;
+}
+.tool-request pre {
+  color: #334155;
 }
 .empty {
   padding: 16px;

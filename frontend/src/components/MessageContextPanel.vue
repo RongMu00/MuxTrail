@@ -11,12 +11,15 @@
           <span>{{ message.role }}</span>
           <span v-if="message.name">{{ message.name }}</span>
         </div>
-        <SafeMarkdown
-          v-if="message.role === 'assistant' && typeof message.content === 'string'"
-          class="message-markdown"
-          :text="message.content"
-        />
-        <pre v-else>{{ formatMessage(message) }}</pre>
+        <div class="message-body">
+          <SafeMarkdown
+            v-if="isMarkdownMessage(message)"
+            class="message-markdown"
+            :text="message.content as string"
+          />
+          <pre v-else-if="formatMessage(message)">{{ formatMessage(message) }}</pre>
+          <p v-else class="empty-content">No textual content.</p>
+        </div>
       </article>
     </div>
 
@@ -41,8 +44,27 @@ const messages = computed(() => {
 
 function formatMessage(message: RuntimeMessage) {
   if (message.tool_call) return JSON.stringify(message.tool_call, null, 2)
-  if (typeof message.content === 'string') return message.content
+  if (message.tool_calls) return JSON.stringify(message.tool_calls, null, 2)
+  if (typeof message.content === 'string') return formatContent(message.content)
   return JSON.stringify(message, null, 2)
+}
+
+function isMarkdownMessage(message: RuntimeMessage) {
+  return message.role === 'assistant'
+    && !message.tool_call
+    && !message.tool_calls
+    && typeof message.content === 'string'
+    && message.content.trim().length > 0
+}
+
+function formatContent(content: string) {
+  const trimmed = content.trim()
+  if (!trimmed || !['{', '['].includes(trimmed[0])) return content
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2)
+  } catch {
+    return content
+  }
 }
 </script>
 
@@ -76,8 +98,12 @@ function formatMessage(message: RuntimeMessage) {
 }
 .message-list {
   padding: 12px;
+  min-width: 0;
 }
 .message-row {
+  min-width: 0;
+  overflow: hidden;
+  contain: layout paint;
   border: 1px solid var(--border);
   background: #fff;
   margin-bottom: 10px;
@@ -91,18 +117,39 @@ function formatMessage(message: RuntimeMessage) {
   font: 700 10px/1 var(--mono);
   text-transform: uppercase;
 }
-pre {
+.message-body {
+  min-width: 0;
+  max-height: 360px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.message-body pre {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   padding: 10px;
   margin: 0;
   color: #111827;
   white-space: pre-wrap;
+  word-break: break-word;
   overflow-wrap: anywhere;
   font: 500 11px/1.55 var(--mono);
 }
 .message-markdown {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
   padding: 10px;
   color: #111827;
   font: 500 11px/1.55 var(--mono);
+}
+.empty-content {
+  margin: 0;
+  padding: 10px;
+  color: var(--muted);
+  font: 500 11px/1.55 var(--mono);
+  font-style: italic;
 }
 .empty {
   padding: 16px;

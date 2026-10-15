@@ -2,7 +2,9 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from muxtrail.contracts.config.types_muxtrail import MuxTrailConfig
 from muxtrail.gateway.app import create_app
+from muxtrail.gateway.boot import GatewayRuntime
 from muxtrail.gateway.demo import DemoGate, DemoLimits
 from muxtrail.tools.policy import ToolPolicy
 
@@ -101,3 +103,31 @@ def test_demo_websocket_does_not_expose_owner_methods(monkeypatch: pytest.Monkey
         rejected = websocket.receive_json()
         assert rejected["ok"] is False
         assert rejected["error"]["code"] == "METHOD_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_demo_runtime_events_are_scoped_to_the_visitors_session() -> None:
+    class CaptureClient:
+        def __init__(self, conn_id: str) -> None:
+            self.conn_id = conn_id
+            self.events: list[dict[str, object]] = []
+
+        async def send_json(self, event: dict[str, object]) -> None:
+            self.events.append(event)
+
+    runtime = GatewayRuntime(MuxTrailConfig())
+    first = CaptureClient("first")
+    second = CaptureClient("second")
+    runtime.attach_session_event_client("demo:first", first)
+    runtime.attach_session_event_client("demo:second", second)
+
+    await runtime._emit_runtime_event(
+        "runtime.messages.initial",
+        layer="runtime",
+        session_key="demo:first",
+        run_id="run-1",
+        data={"messages": [{"role": "user", "content": "hello"}]},
+    )
+
+    assert len(first.events) == 1
+    assert second.events == []

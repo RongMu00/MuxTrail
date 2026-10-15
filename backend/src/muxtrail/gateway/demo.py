@@ -119,32 +119,6 @@ def _client_identity(ws: WebSocket) -> str:
     return ws.client.host if ws.client else "unknown"
 
 
-def _runtime_event(
-    event_type: str,
-    *,
-    layer: str,
-    session_key: str,
-    run_id: str | None,
-    status: str = "active",
-    detail: str = "",
-    data: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    return make_event(
-        "runtime.event",
-        {
-            "type": event_type,
-            "layer": layer,
-            "status": status,
-            "title": event_type.replace("runtime.", "").replace(".", " ").title(),
-            "detail": detail,
-            "sessionKey": session_key,
-            "runId": run_id,
-            "ts": int(time.time() * 1000),
-            "data": data or {},
-        },
-    )
-
-
 def _safe_hello(
     params: dict[str, Any], client: GatewayWsClient, state: GatewayRuntimeState
 ) -> dict[str, Any]:
@@ -218,6 +192,8 @@ async def handle_demo_websocket(
             "maxMessageChars": gate.limits.max_message_chars,
         }
         await client.send_json(make_response(frame.id, True, payload=hello))
+        if runtime is not None:
+            runtime.attach_session_event_client(session_key, client)
         tick.start(client.send_json)
 
         while True:
@@ -307,36 +283,27 @@ async def handle_demo_websocket(
 
             turns += 1
             run_id = secrets.token_urlsafe(12)
-            await client.send_json(
-                _runtime_event(
-                    "runtime.channel.inbound",
-                    layer="channel",
-                    session_key=session_key,
-                    run_id=run_id,
-                    status="done",
-                    detail=message,
-                    data={"channel": "public-demo", "message": message},
-                )
-            )
-            await client.send_json(
-                _runtime_event(
-                    "runtime.run.started",
-                    layer="gateway",
-                    session_key=session_key,
-                    run_id=run_id,
-                    data={"channel": "public-demo", "model": runtime.default_model},
-                )
+            await runtime._emit_runtime_event(
+                "runtime.channel.inbound",
+                layer="channel",
+                session_key=session_key,
+                run_id=run_id,
+                status="done",
+                title="Inbound message",
+                detail=message,
+                data={"channel": "public-demo", "message": message},
             )
 
             async def on_text_delta(text: str, event_run_id: str = run_id) -> None:
                 await client.send_json(
-                    _runtime_event(
-                        "runtime.model.delta",
-                        layer="provider",
-                        session_key=session_key,
-                        run_id=event_run_id,
-                        detail=text,
-                        data={"text": text},
+                    make_event(
+                        "agent.event",
+                        {
+                            "type": "text_delta",
+                            "sessionKey": session_key,
+                            "runId": event_run_id,
+                            "text": text,
+                        },
                     )
                 )
 
@@ -355,17 +322,21 @@ async def handle_demo_websocket(
                 response_text = result.preferred_response or "".join(result.texts)
                 if not response_text:
                     response_text = result.error or "The model returned an empty response."
-                status = "failed" if result.error else "done"
-                await client.send_json(
-                    _runtime_event(
-                        "runtime.run.completed",
-                        layer="runtime",
-                        session_key=session_key,
-                        run_id=run_id,
-                        status=status,
-                        detail=response_text[:300],
-                        data={"responseText": response_text},
-                    )
+                await runtime._emit_runtime_event(
+                    "runtime.channel.reply_sent",
+                    layer="reply",
+                    session_key=session_key,
+                    run_id=run_id,
+                    status="done",
+                    title="Reply delivered to Public Demo",
+                    detail=response_text[:300],
+                    data={
+                        "channel": "public-demo",
+                        "conversationId": session_key,
+                        "traceId": run_id,
+                        "delivery": {"ok": True, "transport": "gateway-websocket"},
+                        "text": response_text,
+                    },
                 )
                 await client.send_json(
                     make_response(
@@ -383,16 +354,15 @@ async def handle_demo_websocket(
                     )
                 )
             except TimeoutError:
-                await client.send_json(
-                    _runtime_event(
-                        "runtime.run.completed",
-                        layer="runtime",
-                        session_key=session_key,
-                        run_id=run_id,
-                        status="failed",
-                        detail="The demo request timed out.",
-                        data={"responseText": "The demo request timed out."},
-                    )
+                await runtime._emit_runtime_event(
+                    "runtime.run.completed",
+                    layer="runtime",
+                    session_key=session_key,
+                    run_id=run_id,
+                    status="failed",
+                    title="Run timed out",
+                    detail="The demo request timed out.",
+                    data={"responseText": "The demo request timed out."},
                 )
                 await client.send_json(
                     make_response(
@@ -409,4 +379,6 @@ async def handle_demo_websocket(
         log.warning("demo_ws_error", error=str(exc))
     finally:
         tick.stop()
+        if runtime is not None:
+            runtime.detach_session_event_client(session_key, client)
         await cleanup_session()

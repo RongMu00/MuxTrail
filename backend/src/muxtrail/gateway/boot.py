@@ -278,12 +278,27 @@ class GatewayRuntime:
         # _event_clients 由 gateway/app.py 在 FastAPI lifespan 中注入。
         # 它不是业务执行必需项，但前端运行工作台依赖它实时展示执行链路。
         self._event_clients: dict[str, Any] | None = None
+        # Public demo clients are kept outside the privileged broadcast pool.
+        # Each client receives full observability events only for its own random session key.
+        self._session_event_clients: dict[str, dict[str, Any]] = {}
         self._event_seq = 0
         self._started_channels: list[tuple[str, str]] = []
 
     def attach_event_clients(self, clients: dict[str, Any]) -> None:
         # FastAPI WebSocket 层管理连接池，GatewayRuntime 只保存引用并在运行时广播事件。
         self._event_clients = clients
+
+    def attach_session_event_client(self, session_key: str, client: Any) -> None:
+        clients = self._session_event_clients.setdefault(session_key, {})
+        clients[client.conn_id] = client
+
+    def detach_session_event_client(self, session_key: str, client: Any) -> None:
+        clients = self._session_event_clients.get(session_key)
+        if clients is None:
+            return
+        clients.pop(client.conn_id, None)
+        if not clients:
+            self._session_event_clients.pop(session_key, None)
 
     async def _emit_runtime_event(
         self,
@@ -299,8 +314,9 @@ class GatewayRuntime:
     ) -> None:
         # runtime.event 是“给人看的运行轨迹”，不参与 agent 决策。
         # 任何一个阶段想让前端看到进度，都通过这里统一发事件。
-        clients = self._event_clients
-        if not clients:
+        clients = self._event_clients or {}
+        session_clients = self._session_event_clients.get(session_key, {})
+        if not clients and not session_clients:
             return
         self._event_seq += 1
         # payload 字段尽量保持稳定，前端可以按 layer/status/runId/sessionKey 做聚合展示。
@@ -315,7 +331,11 @@ class GatewayRuntime:
             "ts": int(time.time() * 1000),
             "data": _redact_trace_value(data or {}),
         }
-        await broadcast_event(clients, make_event(RUNTIME_EVENT, payload, seq=self._event_seq))
+        event = make_event(RUNTIME_EVENT, payload, seq=self._event_seq)
+        if clients:
+            await broadcast_event(clients, event)
+        if session_clients:
+            await broadcast_event(session_clients, event)
 
     def boot(self) -> None:
         # boot 只负责“装配能力”，不处理某条具体用户消息。

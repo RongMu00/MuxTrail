@@ -127,6 +127,7 @@ See [Security and privacy](docs/security.md).
 ## More documentation
 
 - [Environment variables](docs/environment.md)
+- [Production deployment](docs/production-deployment.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Demo script](docs/demo.md)
 - [Roadmap](docs/roadmap.md)

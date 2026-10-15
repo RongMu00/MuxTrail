@@ -17,14 +17,16 @@
             class="message-markdown"
             :text="message.content as string"
           />
-          <pre v-else-if="hasContent(message)">{{ formatContent(String(message.content)) }}</pre>
+          <div v-else-if="hasContent(message)" class="plain-content">
+            {{ formatContent(String(message.content)) }}
+          </div>
           <div
             v-for="(toolCall, toolIndex) in message.displayToolCalls"
             :key="toolIndex"
             class="tool-request"
           >
             <span>Requests tool</span>
-            <pre>{{ JSON.stringify(toolCall, null, 2) }}</pre>
+            <div class="plain-content">{{ JSON.stringify(toolCall, null, 2) }}</div>
           </div>
         </div>
       </article>
@@ -135,9 +137,9 @@ function formatContent(content: string) {
 .message-row {
   position: relative;
   z-index: 0;
+  display: block;
   min-width: 0;
-  overflow: clip;
-  contain: layout paint;
+  overflow: hidden;
   isolation: isolate;
   border: 1px solid var(--border);
   background: #fff;
@@ -157,13 +159,12 @@ function formatContent(content: string) {
   background: #fff;
 }
 .message-body {
-  display: flow-root;
+  display: block;
   min-width: 0;
-  overflow: clip;
-  contain: layout paint;
+  overflow: hidden;
   background: #fff;
 }
-.message-body pre {
+.plain-content {
   display: block;
   width: 100%;
   max-width: 100%;
@@ -194,7 +195,7 @@ function formatContent(content: string) {
   font: 700 9px/1 var(--mono);
   text-transform: uppercase;
 }
-.tool-request pre {
+.tool-request .plain-content {
   color: #334155;
 }
 .empty {
